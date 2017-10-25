@@ -9,6 +9,12 @@
     <ClInclude Include="..\HapDb\HapDb.h">
       <Filter>HapDb</Filter>
     </ClInclude>
+    <ClInclude Include="..\HapDb\HapAppleCharacteristics.h">
+      <Filter>HapDb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\HapDb\HapAppleServices.h">
+      <Filter>HapDb</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="HapTest.cpp" />
