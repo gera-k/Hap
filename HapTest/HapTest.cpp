@@ -8,7 +8,18 @@
 #include "HapAppleCharacteristics.h"
 #include "HapAppleServices.h"
 
-Hap::Service::Lightbulb lb(5);
+//Hap::Service::Lightbulb lb(5);
+
+class MyAcc : public Hap::Accessory::Accessory<1>
+{
+private:
+	Hap::Service::Lightbulb lb = 6;
+public:
+	MyAcc(Hap::Property::AccessoryInstanceId::T aid) : Hap::Accessory::Accessory<1>(aid)
+	{
+		AddSv(&lb);
+	}
+} ac(1);
 
 int main()
 {
@@ -35,12 +46,17 @@ int main()
 //	printf("sizeof(on)=%d  type '%s'  iid %lld  val %d  db '%s'\n",
 //		sizeof(on), on.Type(), on.Iid(), on.Value(), str);
 
-	lb.On()() = true;
+//	lb.On().on();
 
-	l = lb.getDb(str, sizeof(str) - 1);
+//	l = lb.getDb(str, sizeof(str) - 1);
+//	str[l] = 0;
+//	printf("sizeof(lb)=%d  type '%s'  iid %lld  db '%s'\n",
+//		sizeof(lb), lb.Type().get(), lb.Iid().get(), str);
+
+	l = ac.getDb(str, sizeof(str) - 1);
 	str[l] = 0;
-	printf("sizeof(lb)=%d  type '%s'  iid %lld  db '%s'\n",
-		sizeof(lb), lb.Type()(), lb.Iid().get(), str);
+	printf("sizeof(ac)=%d  aid %lld  db '%s'\n",
+		sizeof(ac), ac.Aid().get(), str);
 
 
 //	Hap::Accessory<Hap::Property::Type, Hap::Property::InstanceId> acc(ty, iid);
