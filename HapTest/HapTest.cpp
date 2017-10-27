@@ -10,16 +10,36 @@
 
 //Hap::Service::Lightbulb lb(5);
 
-class MyAcc : public Hap::Accessory::Accessory<1>
+class MyAcc : public Hap::Accessory<1>
 {
 private:
-	Hap::Service::Lightbulb lb = 6;
+	Hap::Lightbulb lb = 6;
 public:
-	MyAcc(Hap::Property::AccessoryInstanceId::T aid) : Hap::Accessory::Accessory<1>(aid)
+	MyAcc(Hap::Property::AccessoryInstanceId::T aid = 0) : Hap::Accessory<1>(aid)
 	{
-		AddSv(&lb);
+		AddServ(&lb);
 	}
-} ac(1);
+};
+
+class MySrv : public Hap::Server<1>
+{
+private:
+	MyAcc acc;
+public:
+	MySrv()
+	{
+		acc.aid(1);
+		AddAcc(&acc);
+	}
+
+	void test()
+	{
+		auto a = GetAcc(1);
+		auto b = GetAcc(2);
+
+		printf("acc %p  a %p  b %p\n", &acc, a, b);
+	}
+} srv;
 
 int main()
 {
@@ -53,11 +73,12 @@ int main()
 //	printf("sizeof(lb)=%d  type '%s'  iid %lld  db '%s'\n",
 //		sizeof(lb), lb.Type().get(), lb.Iid().get(), str);
 
-	l = ac.getDb(str, sizeof(str) - 1);
+	l = srv.getDb(str, sizeof(str) - 1);
 	str[l] = 0;
-	printf("sizeof(ac)=%d  aid %lld  db '%s'\n",
-		sizeof(ac), ac.Aid().get(), str);
+	printf("sizeof(srv)=%d  db '%s'\n",
+		sizeof(srv), str);
 
+	srv.test();
 
 //	Hap::Accessory<Hap::Property::Type, Hap::Property::InstanceId> acc(ty, iid);
 

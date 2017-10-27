@@ -3,6 +3,111 @@
 
 namespace Hap
 {
+	using iid_t = uint32_t;		// limit instance IDs range
+	constexpr iid_t null_id = 0;
+
+	class Obj
+	{
+	public:
+		virtual int getDb(char* str, int max) = 0;
+		virtual iid_t getId() { return null_id; }
+	};
+
+	template<int Count>
+	class ObjArray
+	{
+	private:
+		uint8_t _sz = 0;
+		Obj* _obj[Count];
+	public:
+		uint8_t size() const
+		{
+			return _sz;
+		}
+		void set(Obj* obj)
+		{
+			if (_sz < Count)
+				_obj[_sz++] = obj;
+		}
+		void set(Obj* obj, int i)
+		{
+			if (i < Count)
+			{
+				_obj[i] = obj;
+				if (_sz <= i)
+					_sz = i + 1;
+			}
+		}
+		Obj* get(int i) const
+		{
+			if (i >= _sz)
+				return nullptr;
+			return _obj[i];
+		}
+
+		int getDb(char* str, int max, const char* name = nullptr) const
+		{
+			char* s = str;
+			int l;
+			bool comma;
+
+			if (max <= 0) goto Ret;
+
+			if (name != nullptr)
+			{
+				l = snprintf(s, max, "\"%s\":[", name);
+				s += l;
+				max -= l;
+				if (max <= 0) goto Ret;
+			}
+
+			comma = false;
+			for (int i = 0; i < _sz; i++)
+			{
+				Obj* obj = _obj[i];
+				if (obj != nullptr)
+				{
+					if (comma)
+					{
+						*s++ = ',';
+						max--;
+						if (max <= 0) goto Ret;
+					}
+
+					l = obj->getDb(s, max);
+					s += l;
+					max -= l;
+					if (max <= 0) goto Ret;
+					comma = true;
+				}
+			}
+
+			if (name != nullptr)
+			{
+				*s++ = ']';
+				max--;
+				if (max <= 0) goto Ret;
+			}
+		Ret:
+			return s - str;
+		}
+
+		Obj* GetObj(iid_t id)
+		{
+			for (int i = 0; i < _sz; i++)
+			{
+				Obj* obj = _obj[i];
+				if (obj == nullptr)
+					continue;
+				if (obj->getId() == id)
+					return obj;
+			}
+			return nullptr;
+		}
+
+
+	};
+
 	namespace Property
 	{
 		// 'unit' enumerator values and string representations
@@ -102,6 +207,7 @@ namespace Hap
 			Tlv8,			// uint8_t[S]
 			Data,			// uint8_t[S]
 
+			Id,				// iid_t
 			IdArray,		// uint64_t[S]
 			PtrArray,		// void*[S]
 		};
@@ -122,10 +228,13 @@ namespace Hap
 			"tlv8",
 			"data",
 			nullptr,
+			nullptr,
 			nullptr
 		};
 
-		// this set of templates maps FormatId -> C type and format function
+		// this set of templates maps FormatId to:
+		//	- C type used for internal representation
+		//	- function to format a property to JSON
 		template <FormatId> struct _hap_type;
 		template<> struct _hap_type<FormatId::Null>
 		{
@@ -223,6 +332,7 @@ namespace Hap
 				char* s = str;
 				int l = snprintf(s, max, "\"%.*s\"", _length, v);
 				s += l;
+				
 				return s - str;
 			}
 		};
@@ -230,39 +340,52 @@ namespace Hap
 		{
 			using type = uint8_t;
 		};
+		template<> struct _hap_type<FormatId::Id>
+		{
+			using type = iid_t;
+			static int getDb(char* s, size_t max, type v)
+			{
+				return snprintf(s, max, "%u", v);
+			}
+		};
 		template<> struct _hap_type<FormatId::IdArray>
 		{
 			using type = uint64_t;
-			static int getDb(char* str, size_t max, type v[], int _length)
+			static int getDb(char* str, int max, type v[], int _length)
 			{
 				char* s = str;
+				bool comma;
 
 				*s++ = '[';
 				max--;
+				if (max <= 0) goto Ret;
 
-				bool comma = false;
+				comma = false;
 				for (int i = 0; i < _length; i++)
 				{
 					if (comma)
 					{
 						*s++ = ',';
 						max--;
+						if (max <= 0) goto Ret;
 					}
 					int l = snprintf(s, max, "\"%lld\"", v[i]);
 					s += l;
 					max -= l;
+					if (max <= 0) goto Ret;
+
 					comma = true;
 				}
 
 				*s++ = ']';
-
+			Ret:
 				return s - str;
 			}
 		};
 
 
 		// Hap::Property::Obj - base class of Properties
-		class Obj
+		class Obj : public Hap::Obj
 		{
 		protected:
 			KeyId _keyId;
@@ -275,11 +398,6 @@ namespace Hap
 			const char* key() const
 			{
 				return KeyStr[int(_keyId)];
-			}
-
-			virtual int getDb(char* str, size_t max)
-			{
-				return 0;
 			}
 		};
 
@@ -301,13 +419,23 @@ namespace Hap
 			void set(T v) { _v = v; }
 
 			// get JSON-formatted characteristic descriptor
-			virtual int getDb(char* str, size_t max) override
+			virtual int getDb(char* str, int max) override
 			{
-				int l = snprintf(str, max, "\"%s\":", key());
-				str += l;
+				char* s = str;
+				int l;
+					
+				if (max <= 0) goto Ret;
+
+				l = snprintf(s, max, "\"%s\":", key());
+				s += l;
 				max -= l;
-				l += _hap_type<Format>::getDb(str, max, _v);
-				return l;
+				if (max <= 0) goto Ret;
+
+				l = _hap_type<Format>::getDb(s, max, _v);
+				s += l;
+				max -= l;
+			Ret:
+				return s - str;
 			}
 		};
 
@@ -358,20 +486,31 @@ namespace Hap
 			}
 
 			// get JSON-formatted characteristic descriptor
-			virtual int getDb(char* str, size_t max) override
+			virtual int getDb(char* str, int max) override
 			{
-				int l = snprintf(str, max, "\"%s\":", key());
-				str += l;
+				char*s = str;
+				int l;
+					
+				if (max <= 0) goto Ret;
+
+				l = snprintf(s, max, "\"%s\":", key());
+				s += l;
 				max -= l;
-				l += _hap_type<Format>::getDb(str, max, _v, _length);
-				return l;
+				if (max <= 0) goto Ret;
+
+				l = _hap_type<Format>::getDb(s, max, _v, _length);
+				s += l;
+				max -= l;
+
+			Ret:
+				return s - str;
 			}
 		};
 
 		// Properties
-		using AccessoryInstanceId = Simple<KeyId::AccessoryInstanceId, FormatId::Uint64>;
+		using AccessoryInstanceId = Simple<KeyId::AccessoryInstanceId, FormatId::Id>;
 		using Type = Simple<KeyId::Type, FormatId::ConstStr>;
-		using InstanceId = Simple<KeyId::InstanceId, FormatId::Uint64>;
+		using InstanceId = Simple<KeyId::InstanceId, FormatId::Id>;
 		using HiddenService = Simple<KeyId::HiddenServices, FormatId::Bool>;
 		using PrimaryService = Simple<KeyId::PrimaryServices, FormatId::Bool>;
 		template <uint8_t Size> using LinkedServices = Array<KeyId::LinkedServices, FormatId::IdArray, Size>;
@@ -397,19 +536,24 @@ namespace Hap
 				return (get() & p) != 0;
 			}
 
-			virtual int getDb(char* str, size_t max) override
+			virtual int getDb(char* str, int max) override
 			{
 				static const char* PermStr[] =
 				{
 					"pr", "pw", "ev", "aa", "tw", "hd"
 				};
 				char* s = str;
+				bool comma;
+				int l;
 
-				int l = snprintf(s, max, "\"%s\":[", key());
+				if (max <= 0) goto Ret;
+
+				l = snprintf(s, max, "\"%s\":[", key());
 				s += l;
 				max -= l;
+				if (max <= 0) goto Ret;
 
-				bool comma = false;
+				comma = false;
 				for (int i = 0; i < 5; i++)
 				{
 					if (isEnabled(Perm(1 << i)))
@@ -418,17 +562,20 @@ namespace Hap
 						{
 							*s++ = ',';
 							max--;
+							if (max <= 0) goto Ret;
 						}
 
 						l = snprintf(s, max, "\"%s\"", PermStr[i]);
 						s += l;
 						max -= l;
+						if (max <= 0) goto Ret;
+
 						comma = true;
 					}
 				}
 
 				*s++ = ']';
-
+			Ret:
 				return s - str;
 			}
 		};
@@ -448,40 +595,25 @@ namespace Hap
 
 	namespace Characteristic
 	{
-		class Obj
-		{
-		public:
-			virtual int getDb(char* str, size_t max) = 0;
-		};
-
 		// Hap::Characteristic::Base
 		template<int PropCount>	// number of optional properties
 		class Base : public Obj
 		{
 		private:
-			static constexpr uint8_t _max = PropCount + 4;
-			uint8_t _sz = 0;
-			Property::Obj* _pr[_max];
-		protected:
+			ObjArray<PropCount + 4> _prop;	// first four slots are for mandatory properties:
+		
 			Property::Type _type;
 			Property::InstanceId _iid;
 			Property::Permissions _perms;
 			Property::Format _format;
 
+			void AddProp(Obj* pr, int i) { _prop.set(pr, i); }
+
+		protected:
+			void AddProp(Obj* pr) { _prop.set(pr); }
+//			Obj* GetProp(int i) { return _prop.get(i); }
+
 		public:
-			void AddPr(Property::Obj* ch)
-			{
-				if (_sz < _max)
-					_pr[_sz++] = ch;
-			}
-
-			Property::Obj* GetPr(int i)
-			{
-				if (i >= _sz)
-					return nullptr;
-				return _pr[i];
-			}
-
 			Base(
 				Property::Type::T type,
 				Property::InstanceId::T iid,
@@ -493,46 +625,38 @@ namespace Hap
 				_perms(perms),
 				_format(format)
 			{
-				AddPr(&_type);
-				AddPr(&_iid);
-				AddPr(&_perms);
-				AddPr(&_format);
+				AddProp(&_type, 0);
+				AddProp(&_iid, 1);
+				AddProp(&_perms, 2);
+				AddProp(&_format, 3);
 			}
 
 			// get JSON-formatted characteristic descriptor
-			virtual int getDb(char* str, size_t max) override
+			virtual int getDb(char* str, int max) override
 			{
 				char* s = str;
+				int l;
 
-				if (max < 2)	// space for '{}'
-					return -1;
+				if (max <= 0) goto Ret;
 
 				*s++ = '{';
 				max--;
+				if (max <= 0) goto Ret;
 
-				bool comma = false;
-				for (int i = 0; ; i++)
-				{
-					Property::Obj* pr = GetPr(i);
-					if (pr == nullptr)
-						break;
-
-					if (comma)
-					{
-						*s++ = ',';
-						max--;
-					}
-
-					int l = pr->getDb(s, max);
-					s += l;
-					max -= l;
-					comma = true;
-				}
+				l = _prop.getDb(s, max);
+				s += l;
+				max -= l;
+				if (max <= 0) goto Ret;
 
 				*s++ = '}';
-
+			Ret:
 				return s - str;
 			}
+
+			virtual iid_t getId() override
+			{ 
+				return _iid.get(); 
+			} 
 
 			// access to common properties
 			Property::Type& Type() { return _type; }
@@ -544,9 +668,9 @@ namespace Hap
 			template<typename Prop> Prop* Property()
 			{
 				Property::KeyId key = Prop::K;
-				for (int i = 0; i < _sz; i++)
+				for (int i = 0; i < _prop.size(); i++)
 				{
-					Property::Obj* pr = _pr[i];
+					Property::Obj* pr = static_cast<Property::Obj*>(_prop.get(i));
 					if (pr->keyId() == key)
 						return static_cast<Prop*>(pr);
 				}
@@ -570,7 +694,7 @@ namespace Hap
 			Simple(Hap::Property::Type::T type, Hap::Property::InstanceId::T iid, Property::Permissions::T perms)
 				: Base<PropCount + 1>(type, iid, perms, F)
 			{
-				Base<PropCount + 1>::AddPr(&_value);
+				Base<PropCount + 1>::AddProp(&_value);
 			}
 
 			// get/set the value
@@ -584,7 +708,7 @@ namespace Hap
 			Property::FormatId F,	// format of the Value property
 			int Size = 64			// max size of the array (64 - default size for strings)
 		>
-			class Array : public Base<PropCount + 1>
+		class Array : public Base<PropCount + 1>
 		{
 		public:
 			using T = Property::Array<Property::KeyId::Value, F, Size>;	// type of Value property
@@ -595,7 +719,7 @@ namespace Hap
 			Array(Hap::Property::Type::T type, Hap::Property::InstanceId::T iid, Property::Permissions::T perms)
 				: Base<PropCount + 1>(type, iid, perms, F)
 			{
-				AddPr(&_value);
+				AddProp(&_value);
 			}
 
 			// get/set the value
@@ -606,253 +730,203 @@ namespace Hap
 		};
 	}
 
-	namespace Service
+	// Hap::Service
+	template<int CharCount>	// max number of characteristics
+	class Service : public Obj
 	{
-		// Hap::Service::Obj
-		class Obj
+	private:
+		ObjArray<5> _prop;						// internal properties, slot [4] is for optional Linked property
+
+		Property::Type _type;
+		Property::InstanceId _iid;
+		Property::PrimaryService _primary;
+		Property::HiddenService _hidden;
+
+		void AddProp(Obj* pr, int i) { _prop.set(pr, i); }
+//			Obj* GetProp(int i) { return _prop.get(i); }
+
+		ObjArray<CharCount> _char;	// characteristics
+
+	protected:
+		void AddLinked(Property::Obj* linked) {	AddProp(linked, 4); }
+
+		void AddChar(Obj* ch) { _char.set(ch); }
+//			Obj* GetChar(int i) { return _char.get(i); }
+
+	public:
+		Service(
+			Property::Type::T type,
+			Property::InstanceId::T iid,
+			Property::PrimaryService::T primary = false,
+			Property::HiddenService::T hidden = false
+		) :
+			_type(type),
+			_iid(iid),
+			_primary(primary),
+			_hidden(hidden)
 		{
-		public:
-			virtual int getDb(char* str, size_t max) = 0;
-		};
+			AddProp(&_type, 0);
+			AddProp(&_iid, 1);
+			AddProp(&_primary, 2);
+			AddProp(&_hidden, 3);
+		}
 
-		// Hap::Service::Base
-		template<int CharCount>	// max number of characteristics
-		class Base : public Obj
+		// access to properties
+		Property::Type& Type() { return _type; }
+		Property::InstanceId& Iid() { return _iid; }
+		Property::HiddenService& Hidden() { return _hidden; }
+		Property::PrimaryService& Primary() { return _primary; }
+
+		// get JSON-formatted characteristic descriptor
+		virtual int getDb(char* str, int max) override
 		{
-		private:
-			static constexpr int PropCount = 5;
-			Property::Obj* _pr[PropCount];			// internal properties
+			char* s = str;
+			int l;
 
-			uint8_t _sz = 0;
-			Characteristic::Obj* _ch[CharCount];	// characteristics
+			if (max <= 0) goto Ret;
 
-		protected:
-			void AddPr(Property::Obj* pr, int i)
-			{
-				if (i < PropCount)
-					_pr[i] = pr;
-			}
+			*s++ = '{';
+			max--;
+			if (max <= 0) goto Ret;
 
-			Property::Obj* GetPr(int i)
-			{
-				if (i >= PropCount)
-					return nullptr;
-				return _pr[i];
-			}
+			l = _prop.getDb(s, max);
+			s += l;
+			max -= l;
+			if (max <= 0) goto Ret;
 
-			void AddCh(Characteristic::Obj* ch)
-			{
-				if (_sz < CharCount)
-					_ch[_sz++] = ch;
-			}
+			*s++ = ',';
+			max--;
+			if (max <= 0) goto Ret;
 
-			Characteristic::Obj* GetCh(int i)
-			{
-				if (i >= _sz)
-					return nullptr;
-				return _ch[i];
-			}
-		};
+			l = _char.getDb(s, max, "characteristics");
+			s += l;
+			max -= l;
+			if (max <= 0) goto Ret;
 
-		// Hap::Service::Service - base service class
-		//	CharCount - max number of Characteristics the Service may contain
-		template<int CharCount>
-		class Service : public Base<CharCount>
+			*s++ = '}';
+		Ret:
+			return s - str;
+		}
+
+		virtual iid_t getId() override
 		{
-		protected:
-			Property::Type _type;
-			Property::InstanceId _iid;
-			Property::PrimaryService _primary;
-			Property::HiddenService _hidden;
-		public:
-			Service(
-				Property::Type::T type,
-				Property::InstanceId::T iid,
-				Property::PrimaryService::T primary = false,
-				Property::HiddenService::T hidden = false
-			) :
-				_type(type),
-				_iid(iid),
-				_primary(primary),
-				_hidden(hidden)
-			{
-				Base<CharCount>::AddPr(&_type, 0);
-				Base<CharCount>::AddPr(&_iid, 1);
-				Base<CharCount>::AddPr(&_primary, 2);
-				Base<CharCount>::AddPr(&_hidden, 3);
-			}
+			return _iid.get();
+		}
 
-			void AddLinked(Property::Obj* linked)
-			{
-				Base<CharCount>::AddPr(linked, 4);
-			}
+	};
 
-			// access to properties
-			Property::Type& Type() { return _type; }
-			Property::InstanceId& Iid() { return _iid; }
-			Property::HiddenService& Hidden() { return _hidden; }
-			Property::PrimaryService& Primary() { return _primary; }
-
-			// get JSON-formatted characteristic descriptor
-			virtual int getDb(char* str, size_t max)
-			{
-				char* s = str;
-				int l;
-
-				*s++ = '{';
-				max--;
-
-				for (int i = 0; ; i++)
-				{
-					Property::Obj* pr = Base<CharCount>::GetPr(i);
-					if (pr == NULL)
-						break;
-
-					l = pr->getDb(s, max);
-					s += l;
-					max -= l;
-					*s++ = ',';
-					max--;
-				}
-
-				l = snprintf(s, max, "\"characteristics\":[");
-				s += l;
-				max -= l;
-
-				for (int i = 0; ; i++)
-				{
-					Characteristic::Obj* ch = Base<CharCount>::GetCh(i);
-					if (ch == nullptr)
-						break;
-
-					l = ch->getDb(s, max);
-					s += l;
-					max -= l;
-				}
-
-				*s++ = ']';
-				max--;
-
-				*s++ = '}';
-
-				return s - str;
-			}
-		};
-	}
-
-	namespace Accessory
+	// Hap::Accesory
+	template<int ServCount>	// number of services
+	class Accessory : public Obj
 	{
-		// Hap::Accessory::Obj
-		class Obj
+	private:
+		ObjArray<1> _prop;
+		ObjArray<ServCount> _serv;
+
+		// internal properties
+		Property::AccessoryInstanceId _aid;
+
+		void AddProp(Obj* pr) { _prop.set(pr); }
+//			Obj* GetProp(int i) { return _prop.get(i); }
+
+	protected:
+		void AddServ(Obj* serv) { _serv.set(serv); }
+//			Obj* GetServ(int i) { return _serv.get(i); }
+
+	public:
+		Accessory(Property::AccessoryInstanceId::T aid = 0) 
+		:	_aid(aid)
 		{
-		public:
-			virtual int getDb(char* str, size_t max) = 0;
-		};
+			AddProp(&_aid);
+		}
 
-		// Hap::Accessory::Base
-		template<int ServCount>	// number of services
-		class Base : public Obj
+		// access to properties
+		Property::AccessoryInstanceId& Aid() { return _aid; }
+
+		// get/set accessory ID
+		Property::AccessoryInstanceId::T aid()
 		{
-		private:
-			static constexpr int PropCount = 1;
-			Property::Obj* _pr[PropCount];		// internal properties
-			
-			uint8_t _sz = 0;
-			Service::Obj* _sv[ServCount];
-
-		protected:
-			void AddPr(Property::Obj* pr, int i)
-			{
-				if (i < PropCount)
-					_pr[i] = pr;
-			}
-
-			Property::Obj* GetPr(int i)
-			{
-				if (i >= PropCount)
-					return nullptr;
-				return _pr[i];
-			}
-
-			void AddSv(Service::Obj* sv)
-			{
-				if (_sz < ServCount)
-					_sv[_sz++] = sv;
-			}
-
-			Service::Obj* GetSv(int i)
-			{
-				if (i >= _sz)
-					return nullptr;
-				return _sv[i];
-			}
-		};
-		
-		// Hap::Accessory::Accessory - base accessory class
-		//	ServCount - max number of Services the Accessory may contain
-		template<int ServCount>
-		class Accessory : public Base<ServCount>
+			return _aid.get();
+		}
+		void aid(Property::AccessoryInstanceId::T aid)
 		{
-		protected:
-			Property::AccessoryInstanceId _aid;
-		public:
-			Accessory(
-				Property::AccessoryInstanceId::T aid
-			) :
-				_aid(aid)
-			{
-				Base<ServCount>::AddPr(&_aid, 0);
-			}
+			_aid.set(aid);
+		}
 
-			// access to properties
-			Property::AccessoryInstanceId& Aid() { return _aid; }
+		// get JSON-formatted descriptor
+		virtual int getDb(char* str, int max) override
+		{
+			char* s = str;
+			int l;
 
-			// get JSON-formatted descriptor
-			virtual int getDb(char* str, size_t max)
-			{
-				char* s = str;
-				int l;
+			if (max <= 0) goto Ret;
 
-				*s++ = '{';
-				max--;
+			*s++ = '{';
+			max--;
+			if (max <= 0) goto Ret;
 
-				for (int i = 0; ; i++)
-				{
-					Property::Obj* pr = Base<ServCount>::GetPr(i);
-					if (pr == NULL)
-						break;
+			l = _prop.getDb(s, max);
+			s += l;
+			max -= l;
+			if (max <= 0) goto Ret;
 
-					l = pr->getDb(s, max);
-					s += l;
-					max -= l;
-					*s++ = ',';
-					max--;
-				}
+			*s++ = ',';
+			max--;
+			if (max <= 0) goto Ret;
 
-				l = snprintf(s, max, "\"services\":[");
-				s += l;
-				max -= l;
+			l = _serv.getDb(s, max, "services");
+			s += l;
+			max -= l;
+			if (max <= 0) goto Ret;
 
-				for (int i = 0; ; i++)
-				{
-					Service::Obj* sv = Base<ServCount>::GetSv(i);
-					if (sv == nullptr)
-						break;
+			*s++ = '}';
+		Ret:
+			return s - str;
+		}
 
-					l = sv->getDb(s, max);
-					s += l;
-					max -= l;
-				}
+		virtual iid_t getId() override
+		{
+			return _aid.get();
+		}
+	};
 
-				*s++ = ']';
-				max--;
+	// Hap::Server
+	template<int AccCount>		// max number of Accessories
+	class Server : public Obj
+	{
+	private:
+		ObjArray<AccCount> _acc;
 
-				*s++ = '}';
+	protected:
+		void AddAcc(Obj* acc) {	_acc.set(acc); }
+		Obj* GetAcc(iid_t id) { return _acc.GetObj(id); }
 
-				return s - str;
-			}
-		};
-	}
+	public:
+		Server()
+		{
+		}
+
+		// get JSON-formatted descriptor
+		virtual int getDb(char* str, int max) override
+		{
+			char* s = str;
+			int l;
+
+			if (max <= 0) goto Ret;
+
+			*s++ = '{';
+			max--;
+			if (max <= 0) goto Ret;
+
+			l = _acc.getDb(s, max, "accessories");
+			s += l;
+			max -= l;
+
+			*s++ = '}';
+		Ret:
+			return s - str;
+		}
+	};
 }
 
 #endif
