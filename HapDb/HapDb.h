@@ -202,7 +202,7 @@ namespace Hap
 			Format,			// FormatId
 			Unit,			// UnitId	
 
-			// variable-size properties	- max size is set on compile time
+			// variable-size properties
 			String,			// char[S]
 			Tlv8,			// uint8_t[S]
 			Data,			// uint8_t[S]
@@ -890,9 +890,44 @@ namespace Hap
 		}
 	};
 
-	// Hap::Server
+	enum class Status : uint8_t
+	{
+		Success = 0,
+		RequestDenied,
+		UnableToCommunicate,
+		ResourceIsBusy,
+		CannotWrite,
+		CannotRead,
+		NotificationNotSupported,
+		OutOfResources,
+		OperationTimedOut,
+		ResourceNotExist,
+		InvalidValue,
+		InsufficientAuthorization
+	};
+	static const char* StatusStr(Status c)
+	{
+		static const char* const str[] =
+		{
+			"0",
+			"-70401",
+			"-70402",
+			"-70403",
+			"-70404",
+			"-70405",
+			"-70406",
+			"-70407",
+			"-70408",
+			"-70409",
+			"-70410",
+			"-70411",
+		};
+		return str[int(c)];
+	}
+
+	// Hap::Db
 	template<int AccCount>		// max number of Accessories
-	class Server : public Obj
+	class Db
 	{
 	private:
 		ObjArray<AccCount> _acc;
@@ -902,12 +937,40 @@ namespace Hap
 		Obj* GetAcc(iid_t id) { return _acc.GetObj(id); }
 
 	public:
-		Server()
+
+		enum Status
+		{
+			HTTP_200,
+			HTTP_204,
+			HTTP_207,
+			HTTP_400,
+			HTTP_404,
+			HTTP_422,
+			HTTP_500,
+			HTTP_503
+		};
+		static const char* StatusStr(Status c)
+		{
+			static const char* const str[] =
+			{
+				"200 OK",
+				"204 No Content",
+				"207 Multi-Status",
+				"400 Bad Request",
+				"404 Not Found",
+				"422 Unprocessable Entry",
+				"500 Internal Server Error",
+				"503 Service Unavailable",
+			};
+			return str[int(c)];
+		}
+
+		Db()
 		{
 		}
 
-		// get JSON-formatted descriptor
-		virtual int getDb(char* str, int max) override
+		// get JSON-formatted database
+		int getDb(char* str, int max)
 		{
 			char* s = str;
 			int l;
@@ -926,7 +989,17 @@ namespace Hap
 		Ret:
 			return s - str;
 		}
+
+		// exec HTTP write request
+		//	accepts JSON-formatted message body of parsed HTTP request
+		//	returns HTTP status and JSON-formatted body of HTTP response
+		Status Write(const char* req, int req_size, char* rsp, int rsp_size)
+		{
+
+			return HTTP_200;
+		}
 	};
+
 }
 
 #endif

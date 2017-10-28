@@ -21,7 +21,7 @@ public:
 	}
 };
 
-class MySrv : public Hap::Server<1>
+class MySrv : public Hap::Db<1>
 {
 private:
 	MyAcc acc;
