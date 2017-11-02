@@ -15,10 +15,22 @@
     <ClInclude Include="..\HapDb\HapAppleServices.h">
       <Filter>HapDb</Filter>
     </ClInclude>
+    <ClInclude Include="..\HapDb\jsmn.h">
+      <Filter>HapDb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\HapDb\Hap.h">
+      <Filter>HapDb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\HapDb\HapJson.h">
+      <Filter>HapDb</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="HapTest.cpp" />
     <ClCompile Include="HapDb.cpp">
+      <Filter>HapDb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\HapDb\jsmn.cpp">
       <Filter>HapDb</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,12 +1,9 @@
 #include <SDKDDKVer.h>
 
-#include <stdio.h>
 #include <tchar.h>
 #include <string>
 
-#include "HapDb.h"
-#include "HapAppleCharacteristics.h"
-#include "HapAppleServices.h"
+#include "Hap.h"
 
 //Hap::Service::Lightbulb lb(5);
 
@@ -102,7 +99,16 @@ int main()
 //		sizeof(ls), ls.formatId(), ls.size(), ls.length(), ls[0], ls[1], ls.get(2));
 
 	printf("mvi %d  mvf %g\n", mvi.get(), mvf.get());
+
+	Hap::Json::Parser<> jsp;
+
+	const char wr[] = "{\"characteristics\":[{\"aid\":2,\"iid\":8,\"value\":true},{\"aid\":3,\"iid\":8,\"value\":true}]}";
+	auto rc = jsp.parse(wr, sizeofarr(wr));
 	
+	Log("parse = %d\n", rc);
+
+	jsp.dump();
+
 	return 0;
 }
 
