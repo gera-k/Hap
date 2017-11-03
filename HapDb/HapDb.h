@@ -6,6 +6,8 @@ namespace Hap
 	using iid_t = uint32_t;		// limit instance IDs range
 	constexpr iid_t null_id = 0;
 
+//	static bool strtou64
+
 	enum class Status : uint8_t
 	{
 		Success = 0,
@@ -52,16 +54,19 @@ namespace Hap
 			Hap::iid_t aid;
 			Hap::iid_t iid;
 			const char* val = nullptr;
-			int val_length = 0;
+			uint16_t val_length = 0;
 			bool ev_present = false;
 			bool ev_value = false;
 			const char* auth = nullptr;
-			int auth_length = 0;
+			uint16_t auth_length = 0;
 			bool remote_present = false;
 			bool remote_value = false;
 			Hap::Status status;
 		};
-		virtual void Write(wr_prm& p) {};
+
+		// Write returns true when it completes write to characteristic, 
+		//	status of the operation is indicated in p.status
+		virtual bool Write(wr_prm& p) { return false; };
 
 	};
 
@@ -72,15 +77,18 @@ namespace Hap
 		uint8_t _sz = 0;
 		Obj* _obj[Count];
 	public:
+		// return current size of the array
 		uint8_t size() const
 		{
 			return _sz;
 		}
+		// add object to the end of the array
 		void set(Obj* obj)
 		{
 			if (_sz < Count)
 				_obj[_sz++] = obj;
 		}
+		// add object to position i
 		void set(Obj* obj, int i)
 		{
 			if (i < Count)
@@ -90,6 +98,7 @@ namespace Hap
 					_sz = i + 1;
 			}
 		}
+		// get object at position i
 		Obj* get(int i) const
 		{
 			if (i >= _sz)
@@ -294,6 +303,10 @@ namespace Hap
 			static int getDb(char* s, size_t max, type v)
 			{
 				return snprintf(s, max, "null");
+			}
+			static bool Write(const char* s, uint16_t len)
+			{
+				
 			}
 		};
 		template<> struct _hap_type<FormatId::Bool>
@@ -717,7 +730,7 @@ namespace Hap
 			Property::Format& Format() { return _format; }
 
 			// access to all properties
-			template<typename Prop> Prop* Property()
+			template<typename Prop> Prop* GetProp()
 			{
 				Property::KeyId key = Prop::K;
 				for (int i = 0; i < _prop.size(); i++)
@@ -752,6 +765,49 @@ namespace Hap
 			// get/set the value
 			V Value() { return _value.get(); }
 			void Value(const V& value) { _value.set(value); }
+
+			virtual bool Write(Obj::wr_prm& p) override
+			{ 
+				if (p.iid != Iid().get())
+				{
+					p.status = Hap::Status::ResourceNotExist;
+					return false;
+				}
+
+				// if ev present, set it first
+				if (p.ev_present)
+				{
+					Property::EventNotifications* ev = GetProp<Property::EventNotifications>();
+					if (ev == nullptr)
+					{
+						p.status = Hap::Status::ResourceNotExist;
+					}
+					else if (!Perms().isEnabled(Property::Permissions::Events))
+					{
+						p.status = Hap::Status::NotificationNotSupported;
+					}
+					else
+					{
+						ev->set(p.ev_value);
+					}
+				}
+
+				// if value is present, set it
+				if (p.val != nullptr)
+				{
+					if (!Perms().isEnabled(Property::Permissions::PairedWrite))
+					{
+						p.status = Hap::Status::CannotWrite;
+					}
+					else
+					{
+
+					}
+				}
+
+
+				return true;	// true indicates that characteristic was found
+			};
 		};
 
 		// Hap::Characteristic::Array
@@ -803,7 +859,7 @@ namespace Hap
 		void AddLinked(Property::Obj* linked) {	AddProp(linked, 4); }
 
 		void AddChar(Obj* ch) { _char.set(ch); }
-//			Obj* GetChar(int i) { return _char.get(i); }
+		Obj* GetChar(int i) { return _char.get(i); }
 
 	public:
 		Service(
@@ -865,6 +921,23 @@ namespace Hap
 			return _iid.get();
 		}
 
+		virtual bool Write(wr_prm& p) override
+		{
+			for (int i = 0; i < _char.size(); i++)
+			{
+				auto ch = GetChar(i);
+				if (ch == nullptr)
+					continue;
+
+				if (ch->getId() == p.iid)
+				{
+					return ch->Write(p);
+				}
+			}
+
+			return false;
+		}
+
 	};
 
 	// Hap::Accesory
@@ -883,7 +956,7 @@ namespace Hap
 
 	protected:
 		void AddServ(Obj* serv) { _serv.set(serv); }
-//			Obj* GetServ(int i) { return _serv.get(i); }
+		Obj* GetServ(int i) { return _serv.get(i); }
 
 	public:
 		Accessory(Property::AccessoryInstanceId::T aid = 0) 
@@ -939,6 +1012,29 @@ namespace Hap
 		virtual iid_t getId() override
 		{
 			return _aid.get();
+		}
+
+		virtual bool Write(wr_prm& p) override
+		{
+			if (p.aid != _aid.get())
+			{
+				p.status = Hap::Status::ResourceNotExist;
+				return false;
+			}
+
+			// pass Write to each Service until	it returns true
+			for (int i = 0; i < _serv.size(); i++)
+			{
+				auto serv = GetServ(i);
+				if (serv == nullptr)
+					continue;
+
+				bool rc = serv->Write(p);
+				if (rc)
+					return true;
+			}
+
+			return false;
 		}
 	};
 

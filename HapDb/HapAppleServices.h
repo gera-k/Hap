@@ -33,7 +33,7 @@ namespace Hap
 			AddChar(&_on);
 			_on.Iid() = 6;
 
-			auto p = _on.Property<Property::InstanceId>();
+			auto p = _on.GetProp<Property::InstanceId>();
 			p->set(8);
 
 			Primary() = true;
