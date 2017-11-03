@@ -18,12 +18,12 @@ public:
 	}
 };
 
-class MySrv : public Hap::Db<1>
+class MyDb : public Hap::Db<1>
 {
 private:
 	MyAcc acc;
 public:
-	MySrv()
+	MyDb()
 	{
 		acc.aid(1);
 		AddAcc(&acc);
@@ -36,7 +36,7 @@ public:
 
 		printf("acc %p  a %p  b %p\n", &acc, a, b);
 	}
-} srv;
+} db;
 
 int main()
 {
@@ -70,12 +70,12 @@ int main()
 //	printf("sizeof(lb)=%d  type '%s'  iid %lld  db '%s'\n",
 //		sizeof(lb), lb.Type().get(), lb.Iid().get(), str);
 
-	l = srv.getDb(str, sizeof(str) - 1);
+	l = db.getDb(str, sizeof(str) - 1);
 	str[l] = 0;
 	printf("sizeof(srv)=%d  db '%s'\n",
-		sizeof(srv), str);
+		sizeof(db), str);
 
-	srv.test();
+	db.test();
 
 //	Hap::Accessory<Hap::Property::Type, Hap::Property::InstanceId> acc(ty, iid);
 
@@ -100,14 +100,11 @@ int main()
 
 	printf("mvi %d  mvf %g\n", mvi.get(), mvf.get());
 
-	Hap::Json::Parser<> jsp;
+	const char req[] = "{\"characteristics\":[{\"aid\":2,\"iid\":8,\"value\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
+	char rsp[128];
 
-	const char wr[] = "{\"characteristics\":[{\"aid\":2,\"iid\":8,\"value\":true},{\"aid\":3,\"iid\":8,\"value\":true}]}";
-	auto rc = jsp.parse(wr, sizeofarr(wr));
-	
-	Log("parse = %d\n", rc);
-
-	jsp.dump();
+	auto rc = db.Write(req, sizeof(req), rsp, sizeof(rsp));
+	Log("Write: %d\n", rc);
 
 	return 0;
 }

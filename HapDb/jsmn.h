@@ -18,7 +18,8 @@ typedef enum {
 	JSMN_OBJECT = 1,
 	JSMN_ARRAY = 2,
 	JSMN_STRING = 4,
-	JSMN_PRIMITIVE = 8
+	JSMN_PRIMITIVE = 8,
+	JSMN_ANY = 0x0F,
 } jsmntype_t;
 
 enum jsmnerr {
@@ -37,12 +38,12 @@ enum jsmnerr {
  * end		end position in JSON data string
  */
 typedef struct {
-	jsmntype_t type;
-	int start;
-	int end;
-	int size;
+	int16_t start;
+	int16_t end;
+	int8_t type;
+	int8_t size;
 #ifdef JSMN_PARENT_LINKS
-	int parent;
+	int8_t parent;
 #endif
 } jsmntok_t;
 

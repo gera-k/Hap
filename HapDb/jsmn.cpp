@@ -1,8 +1,9 @@
+// derived from JSMN https://github.com/zserge/jsmn
+
 #include "Hap.h"
 
 namespace Hap {	namespace Json {
 
-// code origin - https://github.com/zserge/jsmn
 #include "jsmn.h"
 
 /**

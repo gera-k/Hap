@@ -6,11 +6,63 @@ namespace Hap
 	using iid_t = uint32_t;		// limit instance IDs range
 	constexpr iid_t null_id = 0;
 
+	enum class Status : uint8_t
+	{
+		Success = 0,
+		RequestDenied,
+		UnableToCommunicate,
+		ResourceIsBusy,
+		CannotWrite,
+		CannotRead,
+		NotificationNotSupported,
+		OutOfResources,
+		OperationTimedOut,
+		ResourceNotExist,
+		InvalidValue,
+		InsufficientAuthorization
+	};
+	static const char* StatusStr(Status c)
+	{
+		static const char* const str[] =
+		{
+			"0",
+			"-70401",
+			"-70402",
+			"-70403",
+			"-70404",
+			"-70405",
+			"-70406",
+			"-70407",
+			"-70408",
+			"-70409",
+			"-70410",
+			"-70411",
+		};
+		return str[int(c)];
+	}
+
 	class Obj
 	{
 	public:
 		virtual int getDb(char* str, int max) = 0;
 		virtual iid_t getId() { return null_id; }
+
+		struct wr_prm
+		{
+			Hap::iid_t aid;
+			Hap::iid_t iid;
+			const char* val = nullptr;
+			int val_length = 0;
+			bool ev_present = false;
+			bool ev_value = false;
+			const char* auth = nullptr;
+			int auth_length = 0;
+			bool remote_present = false;
+			bool remote_value = false;
+			Hap::Status status;
+		};
+		virtual void Write(wr_prm& p) {};
+
 	};
 
 	template<int Count>
@@ -890,41 +942,6 @@ namespace Hap
 		}
 	};
 
-	enum class Status : uint8_t
-	{
-		Success = 0,
-		RequestDenied,
-		UnableToCommunicate,
-		ResourceIsBusy,
-		CannotWrite,
-		CannotRead,
-		NotificationNotSupported,
-		OutOfResources,
-		OperationTimedOut,
-		ResourceNotExist,
-		InvalidValue,
-		InsufficientAuthorization
-	};
-	static const char* StatusStr(Status c)
-	{
-		static const char* const str[] =
-		{
-			"0",
-			"-70401",
-			"-70402",
-			"-70403",
-			"-70404",
-			"-70405",
-			"-70406",
-			"-70407",
-			"-70408",
-			"-70409",
-			"-70410",
-			"-70411",
-		};
-		return str[int(c)];
-	}
-
 	// Hap::Db
 	template<int AccCount>		// max number of Accessories
 	class Db
@@ -937,7 +954,6 @@ namespace Hap
 		Obj* GetAcc(iid_t id) { return _acc.GetObj(id); }
 
 	public:
-
 		enum Status
 		{
 			HTTP_200,
@@ -993,8 +1009,144 @@ namespace Hap
 		// exec HTTP write request
 		//	accepts JSON-formatted message body of parsed HTTP request
 		//	returns HTTP status and JSON-formatted body of HTTP response
-		Status Write(const char* req, int req_size, char* rsp, int rsp_size)
+		Status Write(const char* req, int req_length, char* rsp, int rsp_size)
 		{
+			Hap::Json::Obj<> wr;
+			int rc = wr.parse(req, req_length);
+
+			Log("parse = %d\n", rc);
+
+			// expect root object
+			if (!rc || wr.tk(0)->type != Hap::Json::JSMN_OBJECT)
+			{
+				Log("JSON parse error\n");
+				return HTTP_400;	// Bad request
+			}
+
+			wr.dump();
+
+			// parse root object
+			Hap::Json::member om[] =
+			{
+				{ "characteristics", Hap::Json::JSMN_ARRAY }
+			};
+			rc = wr.parse(0, om, sizeofarr(om));
+			if (rc >= 0)
+			{
+				Log("parameter '%s' is missing or invalid", om[rc].key);
+				return HTTP_400;
+			}
+
+			int cnt = wr.tk(om[0].i)->size;
+			Log("Request contains %d characteristics\n", cnt);
+
+			// prepare response
+			char* s = rsp;
+			int l, max = rsp_size;
+			bool comma = false;
+			int errcnt = 0;
+
+			l = snprintf(s, max, "{\"characteristics\":[");
+			s += l;
+			max -= l;
+			if (max <= 0)
+				return HTTP_500;	// Internal error
+
+			// parse and execute individual writes
+			for (int i = 0; i < cnt; i++)
+			{
+				int c = wr.find(om[0].i, i);
+
+				if (c < 0)
+				{
+					Log("Characteristic %d not found\n", i);
+					return HTTP_400;
+				}
+
+				if (wr.tk(c)->type != Hap::Json::JSMN_OBJECT)
+				{
+					Log("Characteristic %d: Object expected\n", i);
+					return HTTP_400;
+				}
+
+				// parse characteristic object
+				Hap::Json::member om[] =
+				{
+					{ "aid", Hap::Json::JSMN_PRIMITIVE },
+					{ "iid", Hap::Json::JSMN_PRIMITIVE },
+					{ "value", Hap::Json::JSMN_ANY | Hap::Json::JSMN_UNDEFINED },
+					{ "ev", Hap::Json::JSMN_PRIMITIVE | Hap::Json::JSMN_UNDEFINED },
+					{ "authData", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+					{ "remote", Hap::Json::JSMN_PRIMITIVE | Hap::Json::JSMN_UNDEFINED },
+				};
+
+				rc = wr.parse(c, om, sizeofarr(om));
+				if (rc >= 0)
+				{
+					Log("Characteristic %d: parameter '%s' is missing or invalid", i, om[rc].key);
+					return HTTP_400;
+				}
+
+				// fill write request parameters and status
+				Obj::wr_prm p;		
+
+				if (!wr.is_number<Hap::iid_t>(om[0].i, p.aid))
+				{
+					Log("Characteristic %d: invalid aid\n", i);
+					return HTTP_400;
+				}
+
+				if (!wr.is_number<Hap::iid_t>(om[1].i, p.iid))
+				{
+					Log("Characteristic %d: invalid iid\n", i);
+					return HTTP_400;
+				}
+
+				if (om[2].i > 0)
+				{
+					int t = om[2].i;
+					p.val = wr.start(t);
+					p.val_length = wr.length(t);
+				}
+
+				if (om[3].i > 0)
+				{
+					p.ev_present = wr.is_bool(om[3].i, p.ev_value);
+				}
+
+				if (om[4].i > 0)
+				{
+					int t = om[4].i;
+					p.auth = wr.start(t);
+					p.auth_length = wr.length(t);
+				}
+
+				if (om[5].i > 0)
+				{
+					p.remote_present = wr.is_bool(om[5].i, p.remote_value);
+				}
+
+				Log("Characteristic %d:  aid %u  iid %u\n", i, p.aid, p.iid);
+				if (p.val != nullptr)
+					Log("      value: '%.*s'\n", p.val_length, p.val);
+				if (p.ev_present)
+					Log("         ev: %s\n", p.ev_value ? "true" : "false");
+				if (p.auth != nullptr)
+					Log("   authData: '%.*s'\n", p.auth_length, p.auth);
+				if (p.remote_present)
+					Log("         ev: %s\n", p.remote_value ? "true" : "false");
+
+				// find accessory by aid
+				auto acc = GetAcc(p.aid);
+				if (acc == nullptr)
+				{
+					p.status = Hap::Status::ResourceNotExist;
+				}
+				else
+				{
+					acc->Write(p);
+				}
+			}
 
 			return HTTP_200;
 		}
