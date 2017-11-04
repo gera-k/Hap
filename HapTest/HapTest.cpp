@@ -45,8 +45,8 @@ int main()
 	Hap::Property::InstanceId iid;
 	Hap::Property::EventNotifications en(false);
 	Hap::Property::LinkedServices<5> ls;
-	Hap::Property::MinimumValue<Hap::Property::FormatId::Int> mvi(10);
-	Hap::Property::MinimumValue<Hap::Property::FormatId::Float> mvf(1.1);
+	Hap::Property::MinimumValue<Hap::FormatId::Int> mvi(10);
+	Hap::Property::MinimumValue<Hap::FormatId::Float> mvf(1.1);
 	int l;
 
 //	printf("sizeof(c1)=%d  type '%s'  iid %lld\n",
@@ -100,7 +100,7 @@ int main()
 
 	printf("mvi %d  mvf %g\n", mvi.get(), mvf.get());
 
-	const char req[] = "{\"characteristics\":[{\"aid\":2,\"iid\":8,\"value\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
+	const char req[] = "{\"characteristics\":[{\"aid\":1,\"iid\":8,\"value\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
 	char rsp[128];
 
 	auto rc = db.Write(req, sizeof(req), rsp, sizeof(rsp));

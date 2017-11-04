@@ -11,7 +11,7 @@ namespace Hap
 		//	Type public.hap.characteristic.on
 		//	Permissions Paired Read, Paired Write, Notify
 		//	Format bool
-		class On : public Simple< 0, Property::FormatId::Bool >
+		class On : public Simple< 0, FormatId::Bool >
 		{
 		public:
 			On(

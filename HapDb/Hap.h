@@ -4,6 +4,7 @@
 #define sizeofarr(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 #include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 
 #define Log printf

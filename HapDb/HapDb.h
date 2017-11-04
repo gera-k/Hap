@@ -6,8 +6,7 @@ namespace Hap
 	using iid_t = uint32_t;		// limit instance IDs range
 	constexpr iid_t null_id = 0;
 
-//	static bool strtou64
-
+	// Hap operation status
 	enum class Status : uint8_t
 	{
 		Success = 0,
@@ -43,6 +42,314 @@ namespace Hap
 		return str[int(c)];
 	}
 
+	// 'unit' enumerator values and string representations
+	enum class UnitId : uint8_t
+	{
+		Celsius,
+		Percentage,
+		Arcdegrees,
+		Lux,
+		Seconds
+	};
+	const char* const UnitStr[] =
+	{
+		"celsius",
+		"percentage",
+		"arcdegrees",
+		"lux",
+		"seconds"
+	};
+
+	// Property 'key' enum and string representation
+	enum class KeyId : uint8_t
+	{
+		AccessoryInstanceId,
+		Services,
+
+		Type,
+		InstanceId,
+		Characteristics,
+		HiddenServices,
+		PrimaryServices,
+		LinkedServices,
+
+		Value,
+		Permissions,
+		EventNotifications,
+		Description,
+		Format,
+		Unit,
+		MinimumValue,
+		MaximumValue,
+		StepValue,
+		MaxLength,
+		MaxDataLength,
+		ValidValues,
+		ValidValuesRange
+	};
+	const char* const KeyStr[] =
+	{
+		"aid",
+		"services",
+
+		"type",
+		"iid",
+		"characteristics",
+		"hidden",
+		"primary",
+		"linked",
+
+		"value",
+		"perms",
+		"ev",
+		"description",
+		"format",
+		"unit",
+		"minValue",
+		"maxValue",
+		"minStep",
+		"maxLen",
+		"maxDataLen",
+		"valid-values",
+		"valid-values-range"
+	};
+
+	// Property 'format' enum and string representation
+	//	also used to define format of all other properties
+	enum class FormatId : uint8_t
+	{
+		Null = 0,
+
+		// base properties
+		Bool,			// bool
+		Uint8,			// uint8_t
+		Uint16,			// uint16_t
+		Uint32,			// uint32_t
+		Uint64,			// uint64_t
+		Int,			// int32_t
+		Float,			// double
+		ConstStr,		// const char *
+
+		// enumerated properties (internal representation - uint8_t, external - string)
+		Format,			// FormatId
+		Unit,			// UnitId	
+
+		// variable-size properties
+		String,			// char[S]
+		Tlv8,			// uint8_t[S]
+		Data,			// uint8_t[S]
+
+		Id,				// iid_t
+		IdArray,		// uint64_t[S]
+		PtrArray,		// void*[S]
+	};
+	const char* const FormatStr[] =
+	{
+		"null",
+		"bool",
+		"uint8",
+		"uint16",
+		"uint32",
+		"uint64",
+		"int",
+		"float",
+		"string",
+		nullptr,
+		nullptr,
+		"string",
+		"tlv8",
+		"data",
+		nullptr,
+		nullptr,
+		nullptr
+	};
+
+	// this set of templates maps FormatId to:
+	//	- C type used for internal representation
+	//	- getDb function to format a property to JSON
+	//	- Write function to convert JSON token to internal representation
+	template <FormatId> struct hap_type;
+	template<> struct hap_type<FormatId::Null>
+	{
+		using type = uint8_t;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "null");
+		}
+		static inline bool Write(const Hap::Json::Obj& js, int t, type& v)
+		{
+			return js.is_null(t);
+		}
+	};
+	template<> struct hap_type<FormatId::Bool>
+	{
+		using type = bool;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "%s", v ? "true" : "false");
+		}
+		static inline bool Write(const Hap::Json::Obj& js, int t, type& v)
+		{
+			return js.is_bool(t, v);
+		}
+	};
+	template<> struct hap_type<FormatId::Uint8>
+	{
+		using type = uint8_t;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "%u", v);
+		}
+		static inline bool Write(const Hap::Json::Obj& js, int t, type& v)
+		{
+			return js.is_number<type>(t, v);
+		}
+	};
+	template<> struct hap_type<FormatId::Uint16>
+	{
+		using type = uint16_t;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "%u", v);
+		}
+		static inline bool Write(const Hap::Json::Obj& js, int t, type& v)
+		{
+			return js.is_number<type>(t, v);
+		}
+	};
+	template<> struct hap_type<FormatId::Uint32>
+	{
+		using type = uint32_t;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "%u", v);
+		}
+		static inline bool Write(const Hap::Json::Obj& js, int t, type& v)
+		{
+			return js.is_number<type>(t, v);
+		}
+	};
+	template<> struct hap_type<FormatId::Uint64>
+	{
+		using type = uint64_t;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "%llu", v);
+		}
+		static inline bool Write(const Hap::Json::Obj& js, int t, type& v)
+		{
+			return js.is_number<type>(t, v);
+		}
+	};
+	template<> struct hap_type<FormatId::Int>
+	{
+		using type = int32_t;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "%d", v);
+		}
+		static inline bool Write(const Hap::Json::Obj& js, int t, type& v)
+		{
+			return js.is_number<type>(t, v);
+		}
+	};
+	template<> struct hap_type<FormatId::Float>
+	{
+		using type = double;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "%lg", v);
+		}
+		static inline bool Write(const Hap::Json::Obj& js, int t, type& v)
+		{
+			return js.is_number<type>(t, v);
+		}
+	};
+	template<> struct hap_type<FormatId::ConstStr>
+	{
+		using type = const char *;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "\"%s\"", v);
+		}
+	};
+	template<> struct hap_type<FormatId::Format>
+	{
+		using type = FormatId;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "\"%s\"", FormatStr[int(v)]);
+		}
+	};
+	template<> struct hap_type<FormatId::Unit>
+	{
+		using type = UnitId;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "\"%s\"", UnitStr[int(v)]);
+		}
+	};
+	template<> struct hap_type<FormatId::String>
+	{
+		using type = char;
+		static inline int getDb(char* str, size_t max, type v[], int _length)
+		{
+			char* s = str;
+			int l = snprintf(s, max, "\"%.*s\"", _length, v);
+			s += l;
+
+			return s - str;
+		}
+	};
+	template<> struct hap_type<FormatId::Data>
+	{
+		using type = uint8_t;
+	};
+	template<> struct hap_type<FormatId::Id>
+	{
+		using type = iid_t;
+		static inline int getDb(char* s, size_t max, type v)
+		{
+			return snprintf(s, max, "%u", v);
+		}
+	};
+	template<> struct hap_type<FormatId::IdArray>
+	{
+		using type = uint64_t;
+		static int getDb(char* str, int max, type v[], int _length)
+		{
+			char* s = str;
+			bool comma;
+
+			*s++ = '[';
+			max--;
+			if (max <= 0) goto Ret;
+
+			comma = false;
+			for (int i = 0; i < _length; i++)
+			{
+				if (comma)
+				{
+					*s++ = ',';
+					max--;
+					if (max <= 0) goto Ret;
+				}
+				int l = snprintf(s, max, "\"%lld\"", v[i]);
+				s += l;
+				max -= l;
+				if (max <= 0) goto Ret;
+
+				comma = true;
+			}
+
+			*s++ = ']';
+		Ret:
+			return s - str;
+		}
+	};
+
+	// Obj - base class for most of DB objects
+	//	defines set of virtual functions
 	class Obj
 	{
 	public:
@@ -51,43 +358,51 @@ namespace Hap
 
 		struct wr_prm
 		{
+			Hap::Json::Obj& rq;			// request object
+
 			Hap::iid_t aid;
 			Hap::iid_t iid;
-			const char* val = nullptr;
-			uint16_t val_length = 0;
-			bool ev_present = false;
-			bool ev_value = false;
-			const char* auth = nullptr;
-			uint16_t auth_length = 0;
-			bool remote_present = false;
-			bool remote_value = false;
-			Hap::Status status;
+
+			bool val_present = false;	// value member is present
+			uint8_t val_ind = 0;		// value token index in rq
+			bool ev_present = false;	// event member is present
+			bool ev_value = false;		// event member value
+			bool auth_present = false;	// authData member is present 
+			uint8_t auth_ind = 0;		// authData token index in rq
+			bool remote_present = false;// remote member is present
+			bool remote_value = false;	// remote member value
+
+			Hap::Status status = Hap::Status::Success;	// write status
 		};
 
 		// Write returns true when it completes write to characteristic, 
 		//	status of the operation is indicated in p.status
 		virtual bool Write(wr_prm& p) { return false; };
-
 	};
 
+	// array of DB objects
+	//	max size is set on compile time through Count parameter
 	template<int Count>
 	class ObjArray
 	{
 	private:
 		uint8_t _sz = 0;
 		Obj* _obj[Count];
+	
 	public:
 		// return current size of the array
 		uint8_t size() const
 		{
 			return _sz;
 		}
+		
 		// add object to the end of the array
 		void set(Obj* obj)
 		{
 			if (_sz < Count)
 				_obj[_sz++] = obj;
 		}
+		
 		// add object to position i
 		void set(Obj* obj, int i)
 		{
@@ -98,6 +413,7 @@ namespace Hap
 					_sz = i + 1;
 			}
 		}
+		
 		// get object at position i
 		Obj* get(int i) const
 		{
@@ -105,7 +421,22 @@ namespace Hap
 				return nullptr;
 			return _obj[i];
 		}
+		
+		// get(iid_t) - seeks object by object ID
+		Obj* GetObj(iid_t id)
+		{
+			for (int i = 0; i < _sz; i++)
+			{
+				Obj* obj = _obj[i];
+				if (obj == nullptr)
+					continue;
+				if (obj->getId() == id)
+					return obj;
+			}
+			return nullptr;
+		}
 
+		// getDb - create JSON representation of the array
 		int getDb(char* str, int max, const char* name = nullptr) const
 		{
 			char* s = str;
@@ -152,303 +483,10 @@ namespace Hap
 		Ret:
 			return s - str;
 		}
-
-		Obj* GetObj(iid_t id)
-		{
-			for (int i = 0; i < _sz; i++)
-			{
-				Obj* obj = _obj[i];
-				if (obj == nullptr)
-					continue;
-				if (obj->getId() == id)
-					return obj;
-			}
-			return nullptr;
-		}
-
-
 	};
 
 	namespace Property
 	{
-		// 'unit' enumerator values and string representations
-		enum class UnitId : uint8_t
-		{
-			Celsius,
-			Percentage,
-			Arcdegrees,
-			Lux,
-			Seconds
-		};
-		const char* const UnitStr[] =
-		{
-			"celsius",
-			"percentage",
-			"arcdegrees",
-			"lux",
-			"seconds"
-		};
-
-		// Property 'key' enum and string representation
-		enum class KeyId : uint8_t
-		{
-			AccessoryInstanceId,
-			Services,
-
-			Type,
-			InstanceId,
-			Characteristics,
-			HiddenServices,
-			PrimaryServices,
-			LinkedServices,
-
-			Value,
-			Permissions,
-			EventNotifications,
-			Description,
-			Format,
-			Unit,
-			MinimumValue,
-			MaximumValue,
-			StepValue,
-			MaxLength,
-			MaxDataLength,
-			ValidValues,
-			ValidValuesRange
-		};
-		const char* const KeyStr[] =
-		{
-			"aid",
-			"services",
-
-			"type",
-			"iid",
-			"characteristics",
-			"hidden",
-			"primary",
-			"linked",
-
-			"value",
-			"perms",
-			"ev",
-			"description",
-			"format",
-			"unit",
-			"minValue",
-			"maxValue",
-			"minStep",
-			"maxLen",
-			"maxDataLen",
-			"valid-values",
-			"valid-values-range"
-		};
-
-		// Property 'format' enum and string representation
-		//	also used to define format of all other properties
-		enum class FormatId : uint8_t
-		{
-			Null = 0,
-
-			// base properties
-			Bool,			// bool
-			Uint8,			// uint8_t
-			Uint16,			// uint16_t
-			Uint32,			// uint32_t
-			Uint64,			// uint64_t
-			Int,			// int32_t
-			Float,			// double
-			ConstStr,		// const char *
-
-			// enumerated properties (internal representation - uint8_t, external - string)
-			Format,			// FormatId
-			Unit,			// UnitId	
-
-			// variable-size properties
-			String,			// char[S]
-			Tlv8,			// uint8_t[S]
-			Data,			// uint8_t[S]
-
-			Id,				// iid_t
-			IdArray,		// uint64_t[S]
-			PtrArray,		// void*[S]
-		};
-		const char* const FormatStr[] =
-		{
-			"null",
-			"bool",
-			"uint8",
-			"uint16",
-			"uint32",
-			"uint64",
-			"int",
-			"float",
-			"string",
-			nullptr,
-			nullptr,
-			"string",
-			"tlv8",
-			"data",
-			nullptr,
-			nullptr,
-			nullptr
-		};
-
-		// this set of templates maps FormatId to:
-		//	- C type used for internal representation
-		//	- function to format a property to JSON
-		template <FormatId> struct _hap_type;
-		template<> struct _hap_type<FormatId::Null>
-		{
-			using type = uint8_t;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "null");
-			}
-			static bool Write(const char* s, uint16_t len)
-			{
-				
-			}
-		};
-		template<> struct _hap_type<FormatId::Bool>
-		{
-			using type = bool;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "%s", v ? "true" : "false");
-			}
-		};
-		template<> struct _hap_type<FormatId::Uint8>
-		{
-			using type = uint8_t;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "%u", v);
-			}
-		};
-		template<> struct _hap_type<FormatId::Uint16>
-		{
-			using type = uint16_t;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "%u", v);
-			}
-		};
-		template<> struct _hap_type<FormatId::Uint32>
-		{
-			using type = uint32_t;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "%u", v);
-			}
-		};
-		template<> struct _hap_type<FormatId::Uint64>
-		{
-			using type = uint64_t;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "%llu", v);
-			}
-		};
-		template<> struct _hap_type<FormatId::Int>
-		{
-			using type = int32_t;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "%d", v);
-			}
-		};
-		template<> struct _hap_type<FormatId::Float>
-		{
-			using type = double;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "%lg", v);
-			}
-		};
-		template<> struct _hap_type<FormatId::ConstStr>
-		{
-			using type = const char *;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "\"%s\"", v);
-			}
-		};
-		template<> struct _hap_type<FormatId::Format>
-		{
-			using type = FormatId;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "\"%s\"", FormatStr[int(v)]);
-			}
-		};
-		template<> struct _hap_type<FormatId::Unit>
-		{
-			using type = UnitId;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "\"%s\"", UnitStr[int(v)]);
-			}
-		};
-		template<> struct _hap_type<FormatId::String>
-		{
-			using type = char;
-			static int getDb(char* str, size_t max, type v[], int _length)
-			{
-				char* s = str;
-				int l = snprintf(s, max, "\"%.*s\"", _length, v);
-				s += l;
-				
-				return s - str;
-			}
-		};
-		template<> struct _hap_type<FormatId::Data>
-		{
-			using type = uint8_t;
-		};
-		template<> struct _hap_type<FormatId::Id>
-		{
-			using type = iid_t;
-			static int getDb(char* s, size_t max, type v)
-			{
-				return snprintf(s, max, "%u", v);
-			}
-		};
-		template<> struct _hap_type<FormatId::IdArray>
-		{
-			using type = uint64_t;
-			static int getDb(char* str, int max, type v[], int _length)
-			{
-				char* s = str;
-				bool comma;
-
-				*s++ = '[';
-				max--;
-				if (max <= 0) goto Ret;
-
-				comma = false;
-				for (int i = 0; i < _length; i++)
-				{
-					if (comma)
-					{
-						*s++ = ',';
-						max--;
-						if (max <= 0) goto Ret;
-					}
-					int l = snprintf(s, max, "\"%lld\"", v[i]);
-					s += l;
-					max -= l;
-					if (max <= 0) goto Ret;
-
-					comma = true;
-				}
-
-				*s++ = ']';
-			Ret:
-				return s - str;
-			}
-		};
-
-
 		// Hap::Property::Obj - base class of Properties
 		class Obj : public Hap::Obj
 		{
@@ -473,7 +511,7 @@ namespace Hap
 		{
 		public:
 			static constexpr KeyId K = Key;
-			using T = typename _hap_type<Format>::type;
+			using T = typename hap_type<Format>::type;
 		protected:
 			T _v;
 		public:
@@ -496,7 +534,7 @@ namespace Hap
 				max -= l;
 				if (max <= 0) goto Ret;
 
-				l = _hap_type<Format>::getDb(s, max, _v);
+				l = hap_type<Format>::getDb(s, max, _v);
 				s += l;
 				max -= l;
 			Ret:
@@ -510,7 +548,7 @@ namespace Hap
 		class Array : public Obj
 		{
 		public:
-			using T = typename _hap_type<Format>::type;
+			using T = typename hap_type<Format>::type;
 		protected:
 			uint16_t _size = Size;	// max size of the array in elements
 			uint16_t _length;		// current length of _v in elements
@@ -563,7 +601,7 @@ namespace Hap
 				max -= l;
 				if (max <= 0) goto Ret;
 
-				l = _hap_type<Format>::getDb(s, max, _v, _length);
+				l = hap_type<Format>::getDb(s, max, _v, _length);
 				s += l;
 				max -= l;
 
@@ -676,7 +714,7 @@ namespace Hap
 
 		protected:
 			void AddProp(Obj* pr) { _prop.set(pr); }
-//			Obj* GetProp(int i) { return _prop.get(i); }
+//			Parser* GetProp(int i) { return _prop.get(i); }
 
 		public:
 			Base(
@@ -732,7 +770,7 @@ namespace Hap
 			// access to all properties
 			template<typename Prop> Prop* GetProp()
 			{
-				Property::KeyId key = Prop::K;
+				KeyId key = Prop::K;
 				for (int i = 0; i < _prop.size(); i++)
 				{
 					Property::Obj* pr = static_cast<Property::Obj*>(_prop.get(i));
@@ -745,14 +783,14 @@ namespace Hap
 
 		// Hap::Characteristic::Simple
 		template<
-			int PropCount,										// number of optional properties
-			Property::FormatId F = Property::FormatId::Null		// format of the Value property
+			int PropCount,					// number of optional properties
+			FormatId F = FormatId::Null		// format of the Value property
 		>
 		class Simple : public Base<PropCount + 1>
 		{
 		public:
-			using T = Property::Simple<Property::KeyId::Value, F>;	// type of Value property
-			using V = typename T::T;								// C type associated with T
+			using T = Property::Simple<KeyId::Value, F>;	// type of Value property
+			using V = typename T::T;						// C type associated with T
 		protected:
 			T _value;
 		public:
@@ -793,7 +831,7 @@ namespace Hap
 				}
 
 				// if value is present, set it
-				if (p.val != nullptr)
+				if (p.val_present)
 				{
 					if (!Perms().isEnabled(Property::Permissions::PairedWrite))
 					{
@@ -801,10 +839,19 @@ namespace Hap
 					}
 					else
 					{
+						V v;
+						bool rc = hap_type<F>::Write(p.rq, p.val_ind, v);
 
+						if (rc)
+						{
+							_value.set(v);
+						}
+						else
+						{
+							p.status = Hap::Status::InvalidValue;
+						}
 					}
 				}
-
 
 				return true;	// true indicates that characteristic was found
 			};
@@ -813,14 +860,14 @@ namespace Hap
 		// Hap::Characteristic::Array
 		template<
 			int PropCount,			// number of optional properties
-			Property::FormatId F,	// format of the Value property
+			FormatId F,				// format of the Value property
 			int Size = 64			// max size of the array (64 - default size for strings)
 		>
 		class Array : public Base<PropCount + 1>
 		{
 		public:
-			using T = Property::Array<Property::KeyId::Value, F, Size>;	// type of Value property
-			using V = typename T::T;									// C type associated with T (array base type)
+			using T = Property::Array<KeyId::Value, F, Size>;	// type of Value property
+			using V = typename T::T;							// C type associated with T (array base type)
 		protected:
 			T _value;
 		public:
@@ -851,7 +898,7 @@ namespace Hap
 		Property::HiddenService _hidden;
 
 		void AddProp(Obj* pr, int i) { _prop.set(pr, i); }
-//			Obj* GetProp(int i) { return _prop.get(i); }
+//			Parser* GetProp(int i) { return _prop.get(i); }
 
 		ObjArray<CharCount> _char;	// characteristics
 
@@ -952,7 +999,7 @@ namespace Hap
 		Property::AccessoryInstanceId _aid;
 
 		void AddProp(Obj* pr) { _prop.set(pr); }
-//			Obj* GetProp(int i) { return _prop.get(i); }
+//			Parser* GetProp(int i) { return _prop.get(i); }
 
 	protected:
 		void AddServ(Obj* serv) { _serv.set(serv); }
@@ -1107,7 +1154,7 @@ namespace Hap
 		//	returns HTTP status and JSON-formatted body of HTTP response
 		Status Write(const char* req, int req_length, char* rsp, int rsp_size)
 		{
-			Hap::Json::Obj<> wr;
+			Hap::Json::Parser<> wr;
 			int rc = wr.parse(req, req_length);
 
 			Log("parse = %d\n", rc);
@@ -1184,51 +1231,55 @@ namespace Hap
 				}
 
 				// fill write request parameters and status
-				Obj::wr_prm p;		
+				Obj::wr_prm p = { wr };
 
+				// aid
 				if (!wr.is_number<Hap::iid_t>(om[0].i, p.aid))
 				{
 					Log("Characteristic %d: invalid aid\n", i);
 					return HTTP_400;
 				}
 
+				// iid
 				if (!wr.is_number<Hap::iid_t>(om[1].i, p.iid))
 				{
 					Log("Characteristic %d: invalid iid\n", i);
 					return HTTP_400;
 				}
 
+				// value
 				if (om[2].i > 0)
 				{
-					int t = om[2].i;
-					p.val = wr.start(t);
-					p.val_length = wr.length(t);
+					p.val_present = true;
+					p.val_ind = om[2].i;
 				}
 
+				// ev
 				if (om[3].i > 0)
 				{
 					p.ev_present = wr.is_bool(om[3].i, p.ev_value);
 				}
 
+				// authData
 				if (om[4].i > 0)
 				{
-					int t = om[4].i;
-					p.auth = wr.start(t);
-					p.auth_length = wr.length(t);
+					p.auth_present = true;
+					p.auth_ind = om[4].i;
 				}
 
+				// remote
 				if (om[5].i > 0)
 				{
 					p.remote_present = wr.is_bool(om[5].i, p.remote_value);
 				}
 
 				Log("Characteristic %d:  aid %u  iid %u\n", i, p.aid, p.iid);
-				if (p.val != nullptr)
-					Log("      value: '%.*s'\n", p.val_length, p.val);
+				if (p.val_present)
+					Log("      value: '%.*s'\n", wr.length(p.val_ind), wr.start(p.val_ind));
 				if (p.ev_present)
 					Log("         ev: %s\n", p.ev_value ? "true" : "false");
-				if (p.auth != nullptr)
-					Log("   authData: '%.*s'\n", p.auth_length, p.auth);
+				if (p.auth_present)
+					Log("   authData: '%.*s'\n", wr.length(p.auth_ind), wr.start(p.auth_ind));
 				if (p.remote_present)
 					Log("         ev: %s\n", p.remote_value ? "true" : "false");
 

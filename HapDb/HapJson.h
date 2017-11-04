@@ -18,32 +18,30 @@ namespace Hap
 			int i;				// i>0 - key is present, i = index of value; i<=0 - key not present
 		};
 
-		template<int TokenCount = 64>
 		class Obj
 		{
-		private:
-			jsmn_parser _ps;
-			const char* _js;
-			uint16_t _len;
-			jsmntok_t _tk[TokenCount];
-			int _cnt;
+		protected:
+			const char* _js = nullptr;
+			uint16_t _len = 0;
+			jsmntok_t* _tk;
+			int _cnt = 0;
 
 		public:
-			Obj()
+			Obj(jsmntok_t* tk)
+			: _tk(tk)
 			{
-				jsmn_init(&_ps);
 			}
 
 			// token pointer
-			const jsmntok_t* tk(int i)
+			const jsmntok_t* tk(int i) const
 			{
-				if (i < 0 || i >= TokenCount)
+				if (i < 0 || i >= _cnt)
 					return nullptr;
 				return &_tk[i];
 			}
 
 			// token start
-			const char* start(int i)
+			const char* start(int i) const
 			{
 				auto t = tk(i);
 				if (t == nullptr)
@@ -53,7 +51,7 @@ namespace Hap
 			}
 
 			// token length
-			int length(int i)
+			int length(int i) const
 			{
 				auto t = tk(i);
 				if (t == nullptr)
@@ -63,7 +61,7 @@ namespace Hap
 			}
 
 			// is this is the 'null' token?
-			bool is_null(int i)
+			bool is_null(int i) const
 			{
 				auto t = tk(i);
 				if (t == nullptr)
@@ -71,12 +69,12 @@ namespace Hap
 
 				if (cmp(t, "null", JSMN_PRIMITIVE))
 					return true;
-				
+
 				return false;
 			}
 
 			// is this is the 'bool' token?
-			bool is_bool(int i, bool& value)
+			bool is_bool(int i, bool& value) const
 			{
 				auto t = tk(i);
 				if (t == nullptr)
@@ -98,7 +96,7 @@ namespace Hap
 			}
 
 			template<typename T>
-			bool is_number(int i, T& value)
+			bool is_number(int i, T& value) const
 			{
 				char s[24];
 				auto t = tk(i);
@@ -140,7 +138,7 @@ namespace Hap
 			}
 
 			// copy token i into buffer, zero terminate the buffer
-			char* copy(int i, char* buf, size_t size)
+			char* copy(int i, char* buf, size_t size) const
 			{
 				size_t l = 0;
 				const jsmntok_t* t = tk(i);
@@ -155,110 +153,8 @@ namespace Hap
 				return buf;
 			}
 
-			// parse JSON-formatted string
-			bool parse(const char* js, uint16_t len)
-			{
-				_js = js;
-				_len = len;
-
-				_cnt = jsmn_parse(&_ps, _js, _len, _tk, sizeofarr(_tk));
-
-				return _cnt > 0;
-			}
-
-			// parse object
-			// returns -1 when parsed ok, or index of first invalid or missing parameter
-			int parse(int obj, member* om, int om_cnt)
-			{
-				int i;
-
-				for (i = 0; i < om_cnt; i++)
-				{
-					member* m = &om[i];
-
-					// find token that matches the requested key
-					m->i = find(obj, m->key);
-
-					if (m->i > 0)
-					{
-						m->i++;
-
-						// verify that member type is valid
-						if (!(m->type & _tk[m->i].type))
-						{
-							m->i = -1;
-							return i;  // invalid type of key i
-						}
-					}
-				}
-
-				for (i = 0; i < om_cnt; i++)
-				{
-					member* m = &om[i];
-
-					if (!(m->type & JSMN_UNDEFINED) && (m->i < 0))
-						return i;	// missing mandatory key i 
-				}
-
-				return -1;
-			}
-
-			// find object <key> in json object <obj>
-			//	returns token index or -1
-			int find(int obj, const char* key)
-			{
-				if (_tk[obj].type != JSMN_OBJECT)
-					return -1;
-
-				int i = obj + 1;
-				int cnt = _tk[obj].size;		// number of object members
-				while (cnt)
-				{
-					// find next member which parent is obj
-					if (_tk[i].parent == obj)
-					{
-						if (cmp(&_tk[i], key))
-							return i;
-						cnt--;
-					}
-					i++;  //assume t[obj].size is correct so we never go beyond the token array
-				}
-				return -1;
-			}
-
-			// find element <ind> of array <arr>
-			//	returns token index or -1
-			int find(int arr, int ind)
-			{
-				if (_tk[arr].type != JSMN_ARRAY)
-					return -1;
-
-				int i = arr + 1;
-				int cnt = _tk[arr].size;		// number of array elements
-				while (cnt)
-				{
-					// find next element which parent is arr
-					if (_tk[i].parent == arr)
-					{
-						// if requested element is reached, return its index
-						if (ind-- == 0)
-						{
-							return i;
-						}
-						cnt--;
-					}
-					i++;
-				}
-				return -1;
-			}
-
-			void dump()
-			{
-				dump(_tk, _cnt, 0);
-			}
-
-		private:
-			bool cmp(const jsmntok_t *tk, const char *s, uint8_t type = JSMN_STRING)
+		protected:
+			bool cmp(const jsmntok_t *tk, const char *s, uint8_t type = JSMN_STRING) const
 			{
 				int l = tk->end - tk->start;
 				return tk->type & type
@@ -266,7 +162,7 @@ namespace Hap
 					&& strncmp(_js + tk->start, s, l) == 0;
 			}
 
-			int dump(jsmntok_t *t, size_t count, int ind)
+			int dump(const jsmntok_t *t, size_t count, int ind) const
 			{
 				char indent[64];
 				int i, j;
@@ -322,7 +218,122 @@ namespace Hap
 				}
 				return 0;
 			}
+		};
 
+		template<int TokenCount = 64>
+		class Parser : public Obj
+		{
+		private:
+			jsmn_parser _ps;
+			jsmntok_t _tk[TokenCount];
+
+		public:
+			Parser() : Obj(_tk)
+			{
+				jsmn_init(&_ps);
+			}
+
+			// parse JSON-formatted string
+			bool parse(const char* js, uint16_t len)
+			{
+				_js = js;
+				_len = len;
+
+				_cnt = jsmn_parse(&_ps, _js, _len, _tk, sizeofarr(_tk));
+
+				return _cnt > 0;
+			}
+
+			// parse object
+			// returns -1 when parsed ok, or index of first invalid or missing parameter
+			int parse(int obj, member* om, int om_cnt) const
+			{
+				int i;
+
+				for (i = 0; i < om_cnt; i++)
+				{
+					member* m = &om[i];
+
+					// find token that matches the requested key
+					m->i = find(obj, m->key);
+
+					if (m->i > 0)
+					{
+						m->i++;
+
+						// verify that member type is valid
+						if (!(m->type & _tk[m->i].type))
+						{
+							m->i = -1;
+							return i;  // invalid type of key i
+						}
+					}
+				}
+
+				for (i = 0; i < om_cnt; i++)
+				{
+					member* m = &om[i];
+
+					if (!(m->type & JSMN_UNDEFINED) && (m->i < 0))
+						return i;	// missing mandatory key i 
+				}
+
+				return -1;
+			}
+
+			// find object <key> in json object <obj>
+			//	returns token index or -1
+			int find(int obj, const char* key) const
+			{
+				if (_tk[obj].type != JSMN_OBJECT)
+					return -1;
+
+				int i = obj + 1;
+				int cnt = _tk[obj].size;		// number of object members
+				while (cnt)
+				{
+					// find next member which parent is obj
+					if (_tk[i].parent == obj)
+					{
+						if (cmp(&_tk[i], key))
+							return i;
+						cnt--;
+					}
+					i++;  //assume t[obj].size is correct so we never go beyond the token array
+				}
+				return -1;
+			}
+
+			// find element <ind> of array <arr>
+			//	returns token index or -1
+			int find(int arr, int ind) const
+			{
+				if (_tk[arr].type != JSMN_ARRAY)
+					return -1;
+
+				int i = arr + 1;
+				int cnt = _tk[arr].size;		// number of array elements
+				while (cnt)
+				{
+					// find next element which parent is arr
+					if (_tk[i].parent == arr)
+					{
+						// if requested element is reached, return its index
+						if (ind-- == 0)
+						{
+							return i;
+						}
+						cnt--;
+					}
+					i++;
+				}
+				return -1;
+			}
+
+			void dump() const
+			{
+				Obj::dump(_tk, _cnt, 0);
+			}
 		};
 	}
 }

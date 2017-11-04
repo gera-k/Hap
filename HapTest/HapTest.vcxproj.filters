@@ -6,9 +6,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\HapDb\HapDb.h">
-      <Filter>HapDb</Filter>
-    </ClInclude>
     <ClInclude Include="..\HapDb\HapAppleCharacteristics.h">
       <Filter>HapDb</Filter>
     </ClInclude>
@@ -22,6 +19,9 @@
       <Filter>HapDb</Filter>
     </ClInclude>
     <ClInclude Include="..\HapDb\HapJson.h">
+      <Filter>HapDb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\HapDb\HapDb.h">
       <Filter>HapDb</Filter>
     </ClInclude>
   </ItemGroup>
