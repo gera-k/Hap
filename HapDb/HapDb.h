@@ -22,7 +22,7 @@ namespace Hap
 		InvalidValue,
 		InsufficientAuthorization
 	};
-	static const char* StatusStr(Status c)
+	static const char* StatusStr(Hap::Status c)
 	{
 		static const char* const str[] =
 		{
@@ -38,6 +38,33 @@ namespace Hap
 			"-70409",
 			"-70410",
 			"-70411",
+		};
+		return str[int(c)];
+	}
+
+	enum HttpStatus
+	{
+		HTTP_200,
+		HTTP_204,
+		HTTP_207,
+		HTTP_400,
+		HTTP_404,
+		HTTP_422,
+		HTTP_500,
+		HTTP_503
+	};
+	static const char* HttpStatusStr(HttpStatus c)
+	{
+		static const char* const str[] =
+		{
+			"200 OK",
+			"204 No Content",
+			"207 Multi-Status",
+			"400 Bad Request",
+			"404 Not Found",
+			"422 Unprocessable Entry",
+			"500 Internal Server Error",
+			"503 Service Unavailable",
 		};
 		return str[int(c)];
 	}
@@ -350,18 +377,29 @@ namespace Hap
 
 	// Obj - base class for most of DB objects
 	//	defines set of virtual functions
+	//		getId - returns object id (aid or iid), or null_id
+	//		setId - sequentially sets object id, and all child ids; returns next available id
+	//		isType - return true if object has property Type and its value matches t
+	//		getDb - return JSON representation of Db object for GET/accessories request
+	//		Write - write single characteristic
+	//				returns true when it completes write to characteristic, 
+	//					status of the operation is indicated in p.status
+	//				returns false when characteristic not found
 	class Obj
 	{
 	public:
-		virtual int getDb(char* str, int max) = 0;
 		virtual iid_t getId() { return null_id; }
+		virtual iid_t setId(iid_t iid) { return iid; }
+		virtual bool isType(const char* t) { return false; }
+		virtual int getDb(char* str, int max) = 0;
 
+		// parsed parameters of PUT/characteristics request
 		struct wr_prm
 		{
 			Hap::Json::Obj& rq;			// request object
 
-			Hap::iid_t aid;
-			Hap::iid_t iid;
+			iid_t aid = null_id;
+			iid_t iid = null_id;
 
 			bool val_present = false;	// value member is present
 			uint8_t val_ind = 0;		// value token index in rq
@@ -375,19 +413,17 @@ namespace Hap
 			Hap::Status status = Hap::Status::Success;	// write status
 		};
 
-		// Write returns true when it completes write to characteristic, 
-		//	status of the operation is indicated in p.status
 		virtual bool Write(wr_prm& p) { return false; };
 	};
 
-	// array of DB objects
-	//	max size is set on compile time through Count parameter
-	template<int Count>
-	class ObjArray
+	class ObjArrayBase
 	{
-	private:
+	protected:
+		Obj** _obj;
+		uint8_t _max;
 		uint8_t _sz = 0;
-		Obj* _obj[Count];
+
+		ObjArrayBase(Obj** obj, uint8_t max) : _obj(obj), _max(max) {}
 	
 	public:
 		// return current size of the array
@@ -395,25 +431,25 @@ namespace Hap
 		{
 			return _sz;
 		}
-		
+
 		// add object to the end of the array
 		void set(Obj* obj)
 		{
-			if (_sz < Count)
+			if (_sz < _max)
 				_obj[_sz++] = obj;
 		}
-		
+
 		// add object to position i
 		void set(Obj* obj, int i)
 		{
-			if (i < Count)
+			if (i < _max)
 			{
 				_obj[i] = obj;
 				if (_sz <= i)
 					_sz = i + 1;
 			}
 		}
-		
+
 		// get object at position i
 		Obj* get(int i) const
 		{
@@ -421,7 +457,7 @@ namespace Hap
 				return nullptr;
 			return _obj[i];
 		}
-		
+
 		// get(iid_t) - seeks object by object ID
 		Obj* GetObj(iid_t id)
 		{
@@ -435,6 +471,21 @@ namespace Hap
 			}
 			return nullptr;
 		}
+
+		// find object using matching function
+		Obj* GetObj( std::function<bool(Obj*)> match)
+		{
+			for (int i = 0; i < _sz; i++)
+			{
+				Obj* obj = _obj[i];
+				if (obj == nullptr)
+					continue;
+				if (match(obj))
+					return obj;
+			}
+			return nullptr;
+		}
+
 
 		// getDb - create JSON representation of the array
 		int getDb(char* str, int max, const char* name = nullptr) const
@@ -483,6 +534,16 @@ namespace Hap
 		Ret:
 			return s - str;
 		}
+	};
+	// array of DB objects
+	//	max size is set on compile time through Count parameter
+	template<int Count>
+	class ObjArrayStatic : public ObjArrayBase
+	{
+	private:
+		Obj* _obj[Count];
+	public:
+		ObjArrayStatic() : ObjArrayBase(_obj, Count) {}
 	};
 
 	namespace Property
@@ -699,39 +760,52 @@ namespace Hap
 	namespace Characteristic
 	{
 		// Hap::Characteristic::Base
-		template<int PropCount>	// number of optional properties
+		template<int PropertyCount>	// number of optional properties
 		class Base : public Obj
 		{
 		private:
-			ObjArray<PropCount + 4> _prop;	// first four slots are for mandatory properties:
+			ObjArrayStatic<PropertyCount + 4> _prop;	// first four slots are for mandatory properties:
 		
 			Property::Type _type;
 			Property::InstanceId _iid;
 			Property::Permissions _perms;
 			Property::Format _format;
 
-			void AddProp(Obj* pr, int i) { _prop.set(pr, i); }
+			void AddProperty(Obj* pr, int i) { _prop.set(pr, i); }
 
 		protected:
-			void AddProp(Obj* pr) { _prop.set(pr); }
-//			Parser* GetProp(int i) { return _prop.get(i); }
+			void AddProperty(Obj* pr) { _prop.set(pr); }
 
 		public:
 			Base(
 				Property::Type::T type,
-				Property::InstanceId::T iid,
 				Property::Permissions::T perms,
 				Property::Format::T format
 			) :
 				_type(type),
-				_iid(iid),
 				_perms(perms),
 				_format(format)
 			{
-				AddProp(&_type, 0);
-				AddProp(&_iid, 1);
-				AddProp(&_perms, 2);
-				AddProp(&_format, 3);
+				AddProperty(&_type, 0);
+				AddProperty(&_iid, 1);
+				AddProperty(&_perms, 2);
+				AddProperty(&_format, 3);
+			}
+
+			virtual iid_t getId() override
+			{
+				return _iid.get();
+			}
+
+			virtual iid_t setId(iid_t iid) override
+			{
+				_iid.set(iid++);
+				return iid;
+			}
+
+			virtual bool isType(const char* t) override
+			{
+				return strcmp(t, _type.get()) == 0;
 			}
 
 			// get JSON-formatted characteristic descriptor
@@ -756,11 +830,6 @@ namespace Hap
 				return s - str;
 			}
 
-			virtual iid_t getId() override
-			{ 
-				return _iid.get(); 
-			} 
-
 			// access to common properties
 			Property::Type& Type() { return _type; }
 			Property::InstanceId& Iid() { return _iid; }
@@ -768,25 +837,20 @@ namespace Hap
 			Property::Format& Format() { return _format; }
 
 			// access to all properties
-			template<typename Prop> Prop* GetProp()
+			template<typename Prop> Prop* GetProperty()
 			{
-				KeyId key = Prop::K;
-				for (int i = 0; i < _prop.size(); i++)
-				{
-					Property::Obj* pr = static_cast<Property::Obj*>(_prop.get(i));
-					if (pr->keyId() == key)
-						return static_cast<Prop*>(pr);
-				}
-				return nullptr;
+				return static_cast<Prop*>(_prop.GetObj([](Obj* obj) -> bool {
+					return static_cast<Property::Obj*>(obj)->keyId() == Prop::K;
+				}));
 			}
 		};
 
 		// Hap::Characteristic::Simple
 		template<
-			int PropCount,					// number of optional properties
+			int PropertyCount,				// number of optional properties
 			FormatId F = FormatId::Null		// format of the Value property
 		>
-		class Simple : public Base<PropCount + 1>
+		class Simple : public Base<PropertyCount + 1>	// add one slot for the Value property 
 		{
 		public:
 			using T = Property::Simple<KeyId::Value, F>;	// type of Value property
@@ -794,10 +858,10 @@ namespace Hap
 		protected:
 			T _value;
 		public:
-			Simple(Hap::Property::Type::T type, Hap::Property::InstanceId::T iid, Property::Permissions::T perms)
-				: Base<PropCount + 1>(type, iid, perms, F)
+			Simple(Hap::Property::Type::T type, Property::Permissions::T perms)
+				: Base<PropertyCount + 1>(type, perms, F)
 			{
-				Base<PropCount + 1>::AddProp(&_value);
+				Base<PropertyCount + 1>::AddProperty(&_value);
 			}
 
 			// get/set the value
@@ -806,7 +870,7 @@ namespace Hap
 
 			virtual bool Write(Obj::wr_prm& p) override
 			{ 
-				if (p.iid != Iid().get())
+				if (p.iid != Base<PropertyCount + 1>::Iid().get())
 				{
 					p.status = Hap::Status::ResourceNotExist;
 					return false;
@@ -815,12 +879,12 @@ namespace Hap
 				// if ev present, set it first
 				if (p.ev_present)
 				{
-					Property::EventNotifications* ev = GetProp<Property::EventNotifications>();
+					Property::EventNotifications* ev = Base<PropertyCount + 1>::template GetProperty<Property::EventNotifications>();
 					if (ev == nullptr)
 					{
 						p.status = Hap::Status::ResourceNotExist;
 					}
-					else if (!Perms().isEnabled(Property::Permissions::Events))
+					else if (!Base<PropertyCount + 1>::Perms().isEnabled(Property::Permissions::Events))
 					{
 						p.status = Hap::Status::NotificationNotSupported;
 					}
@@ -833,7 +897,7 @@ namespace Hap
 				// if value is present, set it
 				if (p.val_present)
 				{
-					if (!Perms().isEnabled(Property::Permissions::PairedWrite))
+					if (!Base<PropertyCount + 1>::Perms().isEnabled(Property::Permissions::PairedWrite))
 					{
 						p.status = Hap::Status::CannotWrite;
 					}
@@ -859,11 +923,11 @@ namespace Hap
 
 		// Hap::Characteristic::Array
 		template<
-			int PropCount,			// number of optional properties
+			int PropertyCount,			// number of optional properties
 			FormatId F,				// format of the Value property
 			int Size = 64			// max size of the array (64 - default size for strings)
 		>
-		class Array : public Base<PropCount + 1>
+		class Array : public Base<PropertyCount + 1>
 		{
 		public:
 			using T = Property::Array<KeyId::Value, F, Size>;	// type of Value property
@@ -872,9 +936,9 @@ namespace Hap
 			T _value;
 		public:
 			Array(Hap::Property::Type::T type, Hap::Property::InstanceId::T iid, Property::Permissions::T perms)
-				: Base<PropCount + 1>(type, iid, perms, F)
+				: Base<PropertyCount + 1>(type, iid, perms, F)
 			{
-				AddProp(&_value);
+				AddProperty(&_value);
 			}
 
 			// get/set the value
@@ -890,49 +954,71 @@ namespace Hap
 	class Service : public Obj
 	{
 	private:
-		ObjArray<5> _prop;						// internal properties, slot [4] is for optional Linked property
+		// internal properties, slot [4] is for optional Linked property
+		ObjArrayStatic<5> _prop;						
 
 		Property::Type _type;
 		Property::InstanceId _iid;
 		Property::PrimaryService _primary;
 		Property::HiddenService _hidden;
 
-		void AddProp(Obj* pr, int i) { _prop.set(pr, i); }
-//			Parser* GetProp(int i) { return _prop.get(i); }
-
-		ObjArray<CharCount> _char;	// characteristics
+		ObjArrayStatic<CharCount> _char;	// characteristics
 
 	protected:
-		void AddLinked(Property::Obj* linked) {	AddProp(linked, 4); }
+		void AddLinked(Property::Obj& linked) { _prop.set(&linked, 4); }
 
-		void AddChar(Obj* ch) { _char.set(ch); }
-		Obj* GetChar(int i) { return _char.get(i); }
+		void AddCharacteristic(Obj* ch, int i) { _char.set(ch, i); }
+		Obj* GetCharacteristic(int i) { return _char.get(i); }
 
 	public:
-		Service(
-			Property::Type::T type,
-			Property::InstanceId::T iid,
-			Property::PrimaryService::T primary = false,
-			Property::HiddenService::T hidden = false
-		) :
-			_type(type),
-			_iid(iid),
-			_primary(primary),
-			_hidden(hidden)
+		Service(Property::Type::T type) 
+		:	_type(type)
 		{
-			AddProp(&_type, 0);
-			AddProp(&_iid, 1);
-			AddProp(&_primary, 2);
-			AddProp(&_hidden, 3);
+			_prop.set(&_type, 0);
+			_prop.set(&_iid, 1);
+			_prop.set(&_primary, 2);
+			_prop.set(&_hidden, 3);
 		}
 
 		// access to properties
-		Property::Type& Type() { return _type; }
-		Property::InstanceId& Iid() { return _iid; }
-		Property::HiddenService& Hidden() { return _hidden; }
-		Property::PrimaryService& Primary() { return _primary; }
+		void primary(Property::PrimaryService::T v) { _primary.set(v); }
+		void hidden(Property::HiddenService::T v) { _hidden.set(v); }
 
-		// get JSON-formatted characteristic descriptor
+		// access to characteristics
+		template<typename Char> Char* GetCharacteristic()
+		{
+			return static_cast<Char*>(_char.GetObj([](Obj* obj) -> bool {
+				return obj->isType(Char::Type);
+			}));
+		}
+
+		// Obj virtual overrides
+		virtual iid_t getId() override
+		{
+			return _iid.get();
+		}
+
+		virtual iid_t setId(iid_t iid) override
+		{ 
+			_iid.set(iid++); 
+
+			for (int i = 0; i < _char.size(); i++)
+			{
+				auto ch = GetCharacteristic(i);
+				if (ch == nullptr)
+					continue;
+
+				iid = ch->setId(iid);
+			}
+
+			return iid;
+		}
+
+		virtual bool isType(const char* t) override
+		{
+			return strcmp(t, _type.get()) == 0;
+		}
+
 		virtual int getDb(char* str, int max) override
 		{
 			char* s = str;
@@ -963,16 +1049,11 @@ namespace Hap
 			return s - str;
 		}
 
-		virtual iid_t getId() override
-		{
-			return _iid.get();
-		}
-
 		virtual bool Write(wr_prm& p) override
 		{
 			for (int i = 0; i < _char.size(); i++)
 			{
-				auto ch = GetChar(i);
+				auto ch = GetCharacteristic(i);
 				if (ch == nullptr)
 					continue;
 
@@ -988,44 +1069,53 @@ namespace Hap
 	};
 
 	// Hap::Accesory
-	template<int ServCount>	// number of services
+	template<int ServiceCount>	// max number of services
 	class Accessory : public Obj
 	{
 	private:
-		ObjArray<1> _prop;
-		ObjArray<ServCount> _serv;
-
 		// internal properties
+		ObjArrayStatic<1> _prop;
 		Property::AccessoryInstanceId _aid;
 
-		void AddProp(Obj* pr) { _prop.set(pr); }
-//			Parser* GetProp(int i) { return _prop.get(i); }
+		// and array of services
+		ObjArrayStatic<ServiceCount> _serv;	
 
 	protected:
-		void AddServ(Obj* serv) { _serv.set(serv); }
-		Obj* GetServ(int i) { return _serv.get(i); }
+		void AddService(Obj* serv) { _serv.set(serv); }
+		Obj* GetService(int i) { return _serv.get(i); }
 
 	public:
-		Accessory(Property::AccessoryInstanceId::T aid = 0) 
-		:	_aid(aid)
+		Accessory() 
 		{
-			AddProp(&_aid);
+			_prop.set(&_aid,0);
 		}
 
-		// access to properties
-		Property::AccessoryInstanceId& Aid() { return _aid; }
+		// init accessory:
+		//	- set aid
+		//	- set service/characteristic iids for all services/characteristics
+		//	- return next iid 
+		iid_t init(iid_t aid, iid_t iid = 1)
+		{
+			_aid.set(aid);
 
-		// get/set accessory ID
-		Property::AccessoryInstanceId::T aid()
+			for (int i = 0; i < _serv.size(); i++)
+			{
+				auto serv = GetService(i);
+				if (serv == nullptr)
+					continue;
+
+				iid = serv->setId(iid);
+			}
+
+			return iid;
+		}
+
+		// Obj virtual overrides
+		virtual iid_t getId() override
 		{
 			return _aid.get();
 		}
-		void aid(Property::AccessoryInstanceId::T aid)
-		{
-			_aid.set(aid);
-		}
 
-		// get JSON-formatted descriptor
 		virtual int getDb(char* str, int max) override
 		{
 			char* s = str;
@@ -1056,11 +1146,6 @@ namespace Hap
 			return s - str;
 		}
 
-		virtual iid_t getId() override
-		{
-			return _aid.get();
-		}
-
 		virtual bool Write(wr_prm& p) override
 		{
 			if (p.aid != _aid.get())
@@ -1072,12 +1157,11 @@ namespace Hap
 			// pass Write to each Service until	it returns true
 			for (int i = 0; i < _serv.size(); i++)
 			{
-				auto serv = GetServ(i);
+				auto serv = GetService(i);
 				if (serv == nullptr)
 					continue;
 
-				bool rc = serv->Write(p);
-				if (rc)
+				if (serv->Write(p))
 					return true;
 			}
 
@@ -1085,45 +1169,19 @@ namespace Hap
 		}
 	};
 
-	// Hap::Db
+	// Hap::Db - top database object, not inherited from Obj
 	template<int AccCount>		// max number of Accessories
 	class Db
 	{
 	private:
-		ObjArray<AccCount> _acc;
+		// array of accessories
+		ObjArrayStatic<AccCount> _acc;
 
 	protected:
 		void AddAcc(Obj* acc) {	_acc.set(acc); }
 		Obj* GetAcc(iid_t id) { return _acc.GetObj(id); }
 
 	public:
-		enum Status
-		{
-			HTTP_200,
-			HTTP_204,
-			HTTP_207,
-			HTTP_400,
-			HTTP_404,
-			HTTP_422,
-			HTTP_500,
-			HTTP_503
-		};
-		static const char* StatusStr(Status c)
-		{
-			static const char* const str[] =
-			{
-				"200 OK",
-				"204 No Content",
-				"207 Multi-Status",
-				"400 Bad Request",
-				"404 Not Found",
-				"422 Unprocessable Entry",
-				"500 Internal Server Error",
-				"503 Service Unavailable",
-			};
-			return str[int(c)];
-		}
-
 		Db()
 		{
 		}
@@ -1149,10 +1207,12 @@ namespace Hap
 			return s - str;
 		}
 
-		// exec HTTP write request
+		// exec PUT/characteristics request
 		//	accepts JSON-formatted message body of parsed HTTP request
-		//	returns HTTP status and JSON-formatted body of HTTP response
-		Status Write(const char* req, int req_length, char* rsp, int rsp_size)
+		//	returns HTTP status and JSON-formatted body for HTTP response
+		//	the rsp_size must be initially set to size of the rsp buffer;
+		//	on return in contains size of the response object, if any 
+		HttpStatus Write(const char* req, int req_length, char* rsp, int& rsp_size)
 		{
 			Hap::Json::Parser<> wr;
 			int rc = wr.parse(req, req_length);
@@ -1291,11 +1351,49 @@ namespace Hap
 				}
 				else
 				{
-					acc->Write(p);
+					if (!acc->Write(p))
+						p.status = Hap::Status::ResourceNotExist;
 				}
+
+				if (p.status != Hap::Status::Success)
+					errcnt++;
+
+				if (comma)
+				{
+					*s++ = ',';
+					max--;
+					if (max <= 0)
+						return HTTP_500;	// Internal error
+				}
+
+				l = snprintf(s, max, "{\"aid\":%d,\"iid\":%d,\"status\":%s}",
+					p.aid, p.iid, StatusStr(p.status));
+				s += l;
+				max -= l;
+				if (max <= 0)
+					return HTTP_500;	// Internal error
+				comma = true;
+
 			}
 
-			return HTTP_200;
+			l = snprintf(s, max, "]}");
+			s += l;
+			max -= l;
+			if (max <= 0)
+				return HTTP_500;	// Internal error
+
+			if (errcnt == 0)
+			{
+				rsp_size = 0;
+				return HTTP_204;	// No content
+			}
+
+			rsp_size = s - rsp;
+
+			if (cnt == errcnt)		// all writes completed with error
+				return HTTP_400;	// bad request
+
+			return HTTP_207;	// Multi-status
 		}
 	};
 

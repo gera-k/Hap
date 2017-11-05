@@ -15,7 +15,7 @@ namespace Hap
 			uint8_t type;		// expected type mask, may include JSMN_UNDEFINED if key is optional
 
 			// parse results:
-			int i;				// i>0 - key is present, i = index of value; i<=0 - key not present
+			int i = -1;			// i>0 - key is present, i = index of value; i<=0 - key not present
 		};
 
 		class Obj
@@ -95,24 +95,57 @@ namespace Hap
 				return false;
 			}
 
-			template<typename T>
-			bool is_number(int i, T& value) const
+			template<typename T> bool is_number(int i, T& value) const
+			{
+				return false;
+			}
+			template<typename T> bool is_number(int i, std::enable_if_t<std::is_floating_point<T>::value, T&> value)
 			{
 				char s[24];
 				auto t = tk(i);
 				if (t == nullptr)
 					return false;
 
-				if constexpr (std::is_floating_point_v<T>)
+				double v = atof(copy(i, s, sizeofarr(s)));
+				value = v;
+				return true;
+			}
+			template<typename T> bool is_number(int i, std::enable_if_t<std::is_integral<T>::value && std::numeric_limits<T>::is_signed, T&> value)
+			{
+				char s[24];
+				auto t = tk(i);
+				if (t == nullptr)
+					return false;
+
+				int64_t v = atoll(copy(i, s, sizeofarr(s)));
+
+				if (v >= std::numeric_limits<T>::min() && v <= std::numeric_limits<T>::max())
 				{
-					double v = atof(copy(i, s, sizeofarr(s)));
-					value = v;
+					value = static_cast<T>(v);
 					return true;
 				}
+			}
+			template<typename T> bool is_number(int i, std::enable_if_t<std::is_integral<T>::value && !std::numeric_limits<T>::is_signed, T&> value)
+			{
+				char s[24];
+				auto t = tk(i);
+				if (t == nullptr)
+					return false;
 
-				if constexpr (std::is_integral_v<T>)
+				uint64_t v = atoll(copy(i, s, sizeofarr(s)));
+
+				if (v >= std::numeric_limits<T>::min() && v <= std::numeric_limits<T>::max())
 				{
-					if constexpr (std::numeric_limits<T>::is_signed)
+					value = static_cast<T>(v);
+					return true;
+				}
+				return false;
+			}
+
+#if 0
+				if (std::is_integral_v<T>)
+				{
+					if (std::numeric_limits<T>::is_signed)
 					{
 						int64_t v = atoll(copy(i, s, sizeofarr(s)));
 
@@ -136,7 +169,7 @@ namespace Hap
 
 				return false;
 			}
-
+#endif
 			// copy token i into buffer, zero terminate the buffer
 			char* copy(int i, char* buf, size_t size) const
 			{
@@ -147,7 +180,7 @@ namespace Hap
 					l = t->end - t->start;
 					if (l > size - 1)
 						l = size - 1;
-					strncpy_s(buf, size, _js + t->start, l);
+					strncpy(buf, _js + t->start, l);
 				}
 				buf[l] = 0;
 				return buf;

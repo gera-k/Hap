@@ -7,6 +7,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#include <functional>
+
 #define Log printf
 
 #include "HapJson.h"

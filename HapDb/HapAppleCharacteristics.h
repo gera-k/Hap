@@ -11,20 +11,21 @@ namespace Hap
 		//	Type public.hap.characteristic.on
 		//	Permissions Paired Read, Paired Write, Notify
 		//	Format bool
-		class On : public Simple< 0, FormatId::Bool >
+		class On : public Simple< 1, FormatId::Bool >
 		{
+		protected:
+			Hap::Property::EventNotifications ev;
 		public:
-			On(
-				Hap::Property::InstanceId::T iid,
-				Simple::V value = false
-			) : Simple(
-				"25",
-				iid,
+			static constexpr const char* Type = "25";
+
+			On(Simple::V value = false) : Simple(
+				Type,
 				Hap::Property::Permissions::PairedRead |
 				Hap::Property::Permissions::PairedWrite |
 				Hap::Property::Permissions::Events
 			)
 			{
+				AddProperty(&ev);
 				Value(value);
 			}
 
