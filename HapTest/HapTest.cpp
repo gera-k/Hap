@@ -50,13 +50,18 @@ int main()
 	printf("sizeof(srv)=%d  db '%s'\n",
 		sizeof(db), str);
 
-	const char req[] = "{\"characteristics\":[{\"aid\":1,\"iid\":2,\"value\":true,\"ev\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
-//	const char req[] = "{\"characteristics\":[{\"aid\":1,\"iid\":8,\"value\":true}]}";
-	char rsp[128];
+	const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":2,\"value\":true,\"ev\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
+//	const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":8,\"value\":true}]}";
+	char rsp[256];
 	int rsp_size = sizeof(rsp);
 
-	auto rc = db.Write(req, sizeof(req), rsp, rsp_size);
+	auto rc = db.Write(wr, sizeof(wr)-1, rsp, rsp_size);
 	Log("Write: %s  rsp '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp);
+
+	const char rd[] = "id=1.2,3.1&ev=1&meta=1&perms=1&type=1";
+	rsp_size = sizeof(rsp);
+	rc = db.Read(rd, sizeof(rd)-1, rsp, rsp_size);
+	Log("Read: %s  rsp '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp);
 
 	return 0;
 }
@@ -71,8 +76,8 @@ Hap::Property::Type ty("asdfgh");
 Hap::Property::InstanceId iid;
 Hap::Property::EventNotifications en(false);
 Hap::Property::LinkedServices<5> ls;
-Hap::Property::MinimumValue<Hap::FormatId::Int> mvi(10);
-Hap::Property::MinimumValue<Hap::FormatId::Float> mvf(1.1);
+Hap::Property::MinValue<Hap::FormatId::Int> mvi(10);
+Hap::Property::MinValue<Hap::FormatId::Float> mvf(1.1);
 
 //	printf("sizeof(c1)=%d  type '%s'  iid %lld\n",
 //		sizeof(c1), c1.Type(), c1.Iid());
