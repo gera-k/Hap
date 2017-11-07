@@ -10,7 +10,13 @@ class MyLb : public Hap::Lightbulb
 public:
 	MyLb()
 	{
+		On().onRead([this](Hap::Obj::rd_prm& p) -> void {
+			Log("MyLb: read On: %d\n", On().Value());
+		});
 
+		On().onWrite([this](Hap::Obj::wr_prm& p, Hap::Characteristic::On::V v) -> void {
+			Log("MyLb: write On: %d -> %d\n", On().Value(), v);
+		});
 	}
 };
 
@@ -71,6 +77,14 @@ int main()
 	rsp_size = sizeof(rsp);
 	rc = db.Read(rd, sizeof(rd)-1, rsp, rsp_size);
 	Log("Read: %s  rsp '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp);
+
+	rsp_size = sizeof(rsp);
+	rc = db.getEvents(rsp, rsp_size);
+	Log("Events: %s  rsp %d '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp_size, rsp);
+
+	rsp_size = sizeof(rsp);
+	rc = db.getEvents(rsp, rsp_size);
+	Log("Events: %s  rsp %d '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp_size, rsp);
 
 	return 0;
 }

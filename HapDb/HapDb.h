@@ -396,6 +396,7 @@ namespace Hap
 		virtual iid_t setId(iid_t iid) { return iid; }
 		virtual bool isType(const char* t) { return false; }
 		virtual int getDb(char* str, int max) = 0;
+		virtual int getEvents(char* str, int max, iid_t aid = 0, iid_t iid = 0) { return 0; }
 
 		// parsed parameters of PUT/characteristics request
 		struct wr_prm
@@ -537,6 +538,59 @@ namespace Hap
 					}
 
 					l = obj->getDb(s, max);
+					s += l;
+					max -= l;
+					if (max <= 0) goto Ret;
+					comma = true;
+				}
+			}
+
+			if (name != nullptr)
+			{
+				*s++ = ']';
+				max--;
+				if (max <= 0) goto Ret;
+			}
+		Ret:
+			return s - str;
+		}
+
+		// getEvents
+		int getEvents(char* str, int max, const char* name = nullptr, iid_t aid = 0, iid_t iid = 0) const
+		{
+			char* s = str;
+			int l;
+			bool comma;
+
+			if (max <= 0) goto Ret;
+
+			if (name != nullptr)
+			{
+				l = snprintf(s, max, "\"%s\":[", name);
+				s += l;
+				max -= l;
+				if (max <= 0) goto Ret;
+			}
+
+			comma = false;
+			for (int i = 0; i < _sz; i++)
+			{
+				Obj* obj = _obj[i];
+				if (obj != nullptr)
+				{
+					if (comma)
+					{
+						*s++ = ',';
+						max--;
+						if (max <= 0) goto Ret;
+					}
+
+					if (aid == 0)		// accessories array
+						l = obj->getEvents(s, max, obj->getId());
+					else if (iid == 0)	// services array
+						l = obj->getEvents(s, max, aid, obj->getId());
+					else				// characteristics array
+						l = obj->getEvents(s, max, aid, iid);
 					s += l;
 					max -= l;
 					if (max <= 0) goto Ret;
@@ -779,9 +833,6 @@ namespace Hap
 
 	namespace Characteristic
 	{
-		using OnRead = std::function<void(Obj::rd_prm&)>;
-		using OnWrite = std::function<void(Obj::wr_prm&)>;
-
 		// Hap::Characteristic::Base
 		template<int PropertyCount>	// number of optional properties
 		class Base : public Obj
@@ -794,11 +845,13 @@ namespace Hap
 			Property::Format _format;
 			Property::EventNotifications _ev;	// only valid when _perms contains Events
 
-			OnRead _onRead;		// read event handler
-			OnWrite _onWrite;	// write event handler
+			bool _event = false;			// when set, event notification is pending TODO: per-session storage 
 
 		protected:
 			void AddProperty(Obj* pr) { _prop.set(pr); }
+
+			void SetEvent(bool e = true) { _event = e; }
+			bool GetAndClearEvent() { bool ret = _event; _event = false; return ret; }
 
 		public:
 			Base(
@@ -815,16 +868,6 @@ namespace Hap
 				_prop.set(&_perms, 2);
 				_prop.set(&_format, 3);
 				_prop.set(&_ev, 4);
-			}
-
-			void onRead(OnRead h)
-			{
-				_onRead = h;
-			}
-
-			void onWrite(OnWrite h)
-			{
-				_onWrite = h;
 			}
 
 			virtual iid_t getId() override
@@ -887,6 +930,9 @@ namespace Hap
 			}
 		};
 
+		using OnRead = std::function<void(Obj::rd_prm&)>;
+		template<typename V> using OnWrite = std::function<void(Obj::wr_prm&, V)>;
+
 		// Hap::Characteristic::Simple
 		template<
 			int PropertyCount,				// number of optional properties
@@ -897,8 +943,15 @@ namespace Hap
 		public:
 			using T = Property::Simple<KeyId::value, F>;	// type of Value property
 			using V = typename T::T;						// C type associated with T
+		
 		protected:
 			T _value;
+
+			OnRead _onRead;
+			OnWrite<V> _onWrite;
+
+			using B = Base<PropertyCount + 1>;
+
 		public:
 			Simple(Hap::Property::Type::T type, Property::Permissions::T perms)
 				: Base<PropertyCount + 1>(type, perms, F)
@@ -908,11 +961,51 @@ namespace Hap
 
 			// get/set the value
 			V Value() { return _value.get(); }
-			void Value(const V& value) { _value.set(value); }
+			void Value(const V& value) 
+			{ 
+				V v = _value.get();
+
+				_value.set(value);
+			
+				if (B::Perms().isEnabled(Property::Permissions::Events) && v != value)
+					B::SetEvent();
+			}
+
+			// set Read/Write handlers
+			void onRead(OnRead h) { _onRead = h; }
+			void onWrite(OnWrite<V> h) { _onWrite = h; }
+
+			virtual int getEvents(char* str, int max, iid_t aid, iid_t iid) override
+			{
+				char* s = str;
+				int l;
+
+				if (max <= 0) goto Ret;
+
+				if (B::GetAndClearEvent())
+				{
+					*s++ = '{';
+					max--;
+					if (max <= 0) goto Ret;
+
+					l = snprintf(s, max, "\"aid\":%d,\"iid\":%d,", aid, B::Iid().get());
+					s += l;
+					max -= l;
+					if (max <= 0) goto Ret;
+
+					l = _value.getDb(s, max);
+					s += l;
+					max -= l;
+
+					*s++ = '}';
+				}
+			Ret:
+				return s - str;
+			}
 
 			virtual bool Write(Obj::wr_prm& p) override
 			{ 
-				if (p.iid != Base<PropertyCount + 1>::Iid().get())
+				if (p.iid != B::Iid().get())
 				{
 					p.status = Hap::Status::ResourceNotExist;
 					return false;
@@ -921,37 +1014,52 @@ namespace Hap
 				// if ev present, set it first
 				if (p.ev_present)
 				{
-					if (!Base<PropertyCount + 1>::Perms().isEnabled(Property::Permissions::Events))
+					if (!B::Perms().isEnabled(Property::Permissions::Events))
 					{
 						p.status = Hap::Status::NotificationNotSupported;
 					}
 					else
 					{
-						EventNotifications().set(p.ev_value);
+						B::EventNotifications().set(p.ev_value);
+						if (!p.ev_value)
+							B::SetEvent(false);
 					}
 				}
 
 				// if value is present, set it
 				if (p.val_present)
 				{
-					if (!Base<PropertyCount + 1>::Perms().isEnabled(Property::Permissions::PairedWrite))
+					if (!B::Perms().isEnabled(Property::Permissions::PairedWrite))
 					{
 						p.status = Hap::Status::CannotWrite;
 					}
 					else
 					{
+						// convert JSON token to internal value
 						V v;
 						bool rc = hap_type<F>::Write(p.rq, p.val_ind, v);
 
 						if (rc)
 						{
-							_value.set(v);
+							V old = Value();
+
+							// call write handler
+							if (_onWrite)
+							{
+								_onWrite(p, v);
+
+								if (p.status != Hap::Status::Success)
+									return true;
+							}
+
+							Value(v);
 						}
 						else
 						{
 							p.status = Hap::Status::InvalidValue;
 						}
 					}
+
 				}
 
 				return true;	// true indicates that characteristic was found
@@ -959,7 +1067,7 @@ namespace Hap
 
 			virtual bool Read(Obj::rd_prm& p) override
 			{
-				if (p.iid != Base<PropertyCount + 1>::Iid().get())
+				if (p.iid != B::Iid().get())
 				{
 					p.status = Hap::Status::ResourceNotExist;
 					return false;
@@ -968,12 +1076,21 @@ namespace Hap
 				int l;
 
 				// add value
-				if (!Base<PropertyCount + 1>::Perms().isEnabled(Property::Permissions::PairedRead))
+				if (!B::Perms().isEnabled(Property::Permissions::PairedRead))
 				{
 					p.status = Hap::Status::CannotRead;
 				}
 				else
 				{
+					// call read handler, abort read if non-success status is set
+					if (_onRead)
+					{
+						_onRead(p);
+
+						if (p.status != Hap::Status::Success)
+							return true;
+					}
+
 					*p.s++ = ',';
 					p.max--;
 					if (p.max <= 0) return true;
@@ -993,12 +1110,12 @@ namespace Hap
 					p.max--;
 					if (p.max <= 0) return true;
 
-					l = Format().getDb(p.s, p.max);
+					l = B::Format().getDb(p.s, p.max);
 					p.s += l;
 					p.max -= l;
 					if (p.max <= 0)	return true;
 
-					prop = GetProperty(KeyId::unit);
+					prop = B::GetProperty(KeyId::unit);
 					if (prop != nullptr)
 					{
 						*p.s++ = ',';
@@ -1011,7 +1128,7 @@ namespace Hap
 						if (p.max <= 0)	return true;
 					}
 
-					prop = GetProperty(KeyId::minValue);
+					prop = B::GetProperty(KeyId::minValue);
 					if (prop != nullptr)
 					{
 						*p.s++ = ',';
@@ -1024,7 +1141,7 @@ namespace Hap
 						if (p.max <= 0)	return true;
 					}
 
-					prop = GetProperty(KeyId::maxValue);
+					prop = B::GetProperty(KeyId::maxValue);
 					if (prop != nullptr)
 					{
 						*p.s++ = ',';
@@ -1037,7 +1154,7 @@ namespace Hap
 						if (p.max <= 0)	return true;
 					}
 
-					prop = GetProperty(KeyId::minStep);
+					prop = B::GetProperty(KeyId::minStep);
 					if (prop != nullptr)
 					{
 						*p.s++ = ',';
@@ -1050,7 +1167,7 @@ namespace Hap
 						if (p.max <= 0)	return true;
 					}
 
-					prop = GetProperty(KeyId::maxLen);
+					prop = B::GetProperty(KeyId::maxLen);
 					if (prop != nullptr)
 					{
 						*p.s++ = ',';
@@ -1071,7 +1188,7 @@ namespace Hap
 					p.max--;
 					if (p.max <= 0) return true;
 
-					l = Perms().getDb(p.s, p.max);
+					l = B::Perms().getDb(p.s, p.max);
 					p.s += l;
 					p.max -= l;
 					if (p.max <= 0)	return true;
@@ -1084,7 +1201,7 @@ namespace Hap
 					p.max--;
 					if (p.max <= 0) return true;
 
-					l = Type().getDb(p.s, p.max);
+					l = B::Type().getDb(p.s, p.max);
 					p.s += l;
 					p.max -= l;
 					if (p.max <= 0)	return true;
@@ -1097,7 +1214,7 @@ namespace Hap
 					p.max--;
 					if (p.max <= 0) return true;
 
-					l = EventNotifications().getDb(p.s, p.max);
+					l = B::EventNotifications().getDb(p.s, p.max);
 					p.s += l;
 					p.max -= l;
 					if (p.max <= 0)	return true;
@@ -1235,6 +1352,20 @@ namespace Hap
 			return s - str;
 		}
 
+		virtual int getEvents(char* str, int max, iid_t aid, iid_t iid) override
+		{
+			char* s = str;
+			int l;
+
+			if (max <= 0) goto Ret;
+
+			l = _char.getEvents(s, max, "characteristics", aid, iid);
+			s += l;
+			max -= l;
+		Ret:
+			return s - str;
+		}
+
 		virtual bool Write(wr_prm& p) override
 		{
 			for (int i = 0; i < _char.size(); i++)
@@ -1349,6 +1480,20 @@ namespace Hap
 			return s - str;
 		}
 
+		virtual int getEvents(char* str, int max, iid_t aid, iid_t iid) override
+		{
+			char* s = str;
+			int l;
+
+			if (max <= 0) goto Ret;
+
+			l = _serv.getEvents(s, max, nullptr, aid, iid);
+			s += l;
+			max -= l;
+		Ret:
+			return s - str;
+		}
+
 		virtual bool Write(wr_prm& p) override
 		{
 			if (p.aid != _aid.get())
@@ -1411,7 +1556,7 @@ namespace Hap
 		{
 		}
 
-		// get JSON-formatted database
+		//TODO: return HttpStatus get JSON-formatted database
 		int getDb(char* str, int max)
 		{
 			char* s = str;
@@ -1430,6 +1575,38 @@ namespace Hap
 			*s++ = '}';
 		Ret:
 			return s - str;
+		}
+
+		// collect events
+		//	returns HTTP status and JSON-formatted body for HTTP EVENT
+		//	the rsp_size must be initially set to size of the rsp buffer;
+		//	on return in contains size of the response object, if any 
+		HttpStatus getEvents(char* rsp, int& rsp_size)
+		{
+			char* s = rsp;
+			int l, max = rsp_size;
+
+			rsp_size = 0;
+
+			*s++ = '{';
+			max--;
+			if (max <= 0)
+				return HTTP_500;	// Internal error
+
+			l = _acc.getEvents(s, max);
+			s += l;
+			max -= l;
+			if (max <= 0)
+				return HTTP_500;	// Internal error
+
+			*s++ = '}';
+			max--;
+			if (max <= 0)
+				return HTTP_500;	// Internal error
+
+			rsp_size = s - rsp;
+
+			return HTTP_200;
 		}
 
 		// exec PUT/characteristics request

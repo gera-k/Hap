@@ -38,7 +38,7 @@ namespace Hap
 		}
 
 		// access to internal characteristics
-		//Characteristic::On& On() { return _on; }
+		Characteristic::On& On() { return _on; }
 
 	};
 }
