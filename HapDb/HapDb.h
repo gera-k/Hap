@@ -385,6 +385,10 @@ namespace Hap
 	//				returns true when it completes write to characteristic, 
 	//					status of the operation is indicated in p.status
 	//				returns false when characteristic not found
+	//		Read - Read single characteristic
+	//				returns true when it completes read from characteristic, 
+	//					status of the operation is indicated in p.status
+	//				returns false when characteristic not found
 	class Obj
 	{
 	public:
@@ -435,9 +439,9 @@ namespace Hap
 	class ObjArrayBase
 	{
 	protected:
-		Obj** _obj;
-		uint8_t _max;
-		uint8_t _sz = 0;
+		Obj** _obj;			// points to array storage
+		uint8_t _max;		// max number of elements
+		uint8_t _sz = 0;	// current array size
 
 		ObjArrayBase(Obj** obj, uint8_t max) : _obj(obj), _max(max) {}
 	
@@ -502,7 +506,6 @@ namespace Hap
 			return nullptr;
 		}
 
-
 		// getDb - create JSON representation of the array
 		int getDb(char* str, int max, const char* name = nullptr) const
 		{
@@ -551,7 +554,8 @@ namespace Hap
 			return s - str;
 		}
 	};
-	// array of DB objects
+	
+	// static array of DB objects
 	//	max size is set on compile time through Count parameter
 	template<int Count>
 	class ObjArrayStatic : public ObjArrayBase
@@ -775,19 +779,23 @@ namespace Hap
 
 	namespace Characteristic
 	{
+		using OnRead = std::function<void(Obj::rd_prm&)>;
+		using OnWrite = std::function<void(Obj::wr_prm&)>;
+
 		// Hap::Characteristic::Base
 		template<int PropertyCount>	// number of optional properties
 		class Base : public Obj
 		{
 		private:
-			ObjArrayStatic<PropertyCount + 4> _prop;	// first four slots are for mandatory properties:
-		
+			ObjArrayStatic<PropertyCount + 5> _prop;	// first five slots are for common properties:
 			Property::Type _type;
 			Property::InstanceId _iid;
 			Property::Permissions _perms;
 			Property::Format _format;
+			Property::EventNotifications _ev;	// only valid when _perms contains Events
 
-			void AddProperty(Obj* pr, int i) { _prop.set(pr, i); }
+			OnRead _onRead;		// read event handler
+			OnWrite _onWrite;	// write event handler
 
 		protected:
 			void AddProperty(Obj* pr) { _prop.set(pr); }
@@ -802,10 +810,21 @@ namespace Hap
 				_perms(perms),
 				_format(format)
 			{
-				AddProperty(&_type, 0);
-				AddProperty(&_iid, 1);
-				AddProperty(&_perms, 2);
-				AddProperty(&_format, 3);
+				_prop.set(&_type, 0);
+				_prop.set(&_iid, 1);
+				_prop.set(&_perms, 2);
+				_prop.set(&_format, 3);
+				_prop.set(&_ev, 4);
+			}
+
+			void onRead(OnRead h)
+			{
+				_onRead = h;
+			}
+
+			void onWrite(OnWrite h)
+			{
+				_onWrite = h;
 			}
 
 			virtual iid_t getId() override
@@ -851,6 +870,7 @@ namespace Hap
 			Property::InstanceId& Iid() { return _iid; }
 			Property::Permissions& Perms() { return _perms; }
 			Property::Format& Format() { return _format; }
+			Property::EventNotifications& EventNotifications() { return _ev; }
 
 			// access to all properties
 			template<typename Prop> Prop* GetProperty()
@@ -901,18 +921,13 @@ namespace Hap
 				// if ev present, set it first
 				if (p.ev_present)
 				{
-					Property::EventNotifications* ev = Base<PropertyCount + 1>::template GetProperty<Property::EventNotifications>();
-					if (ev == nullptr)
-					{
-						p.status = Hap::Status::ResourceNotExist;
-					}
-					else if (!Base<PropertyCount + 1>::Perms().isEnabled(Property::Permissions::Events))
+					if (!Base<PropertyCount + 1>::Perms().isEnabled(Property::Permissions::Events))
 					{
 						p.status = Hap::Status::NotificationNotSupported;
 					}
 					else
 					{
-						ev->set(p.ev_value);
+						EventNotifications().set(p.ev_value);
 					}
 				}
 
@@ -1078,7 +1093,14 @@ namespace Hap
 				// add ev
 				if (p.ev)
 				{
+					*p.s++ = ',';
+					p.max--;
+					if (p.max <= 0) return true;
 
+					l = EventNotifications().getDb(p.s, p.max);
+					p.s += l;
+					p.max -= l;
+					if (p.max <= 0)	return true;
 				}
 
 				return true;	// true indicates that characteristic was found

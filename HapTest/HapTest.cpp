@@ -5,10 +5,19 @@
 
 #include "Hap.h"
 
+class MyLb : public Hap::Lightbulb
+{
+public:
+	MyLb()
+	{
+
+	}
+};
+
 class MyAcc : public Hap::Accessory<1>
 {
 private:
-	Hap::Lightbulb lb;
+	MyLb lb;
 public:
 	MyAcc() : Hap::Accessory<1>()
 	{
