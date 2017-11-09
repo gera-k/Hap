@@ -1,37 +1,37 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="HapDb">
+    <Filter Include="Hap">
       <UniqueIdentifier>{01938fae-a108-4fda-aa5f-5161f7456ef7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\HapDb\HapAppleCharacteristics.h">
-      <Filter>HapDb</Filter>
+    <ClInclude Include="..\Hap\Hap.h">
+      <Filter>Hap</Filter>
     </ClInclude>
-    <ClInclude Include="..\HapDb\HapAppleServices.h">
-      <Filter>HapDb</Filter>
+    <ClInclude Include="..\Hap\HapAppleCharacteristics.h">
+      <Filter>Hap</Filter>
     </ClInclude>
-    <ClInclude Include="..\HapDb\jsmn.h">
-      <Filter>HapDb</Filter>
+    <ClInclude Include="..\Hap\HapAppleServices.h">
+      <Filter>Hap</Filter>
     </ClInclude>
-    <ClInclude Include="..\HapDb\Hap.h">
-      <Filter>HapDb</Filter>
+    <ClInclude Include="..\Hap\HapDb.h">
+      <Filter>Hap</Filter>
     </ClInclude>
-    <ClInclude Include="..\HapDb\HapJson.h">
-      <Filter>HapDb</Filter>
+    <ClInclude Include="..\Hap\HapJson.h">
+      <Filter>Hap</Filter>
     </ClInclude>
-    <ClInclude Include="..\HapDb\HapDb.h">
-      <Filter>HapDb</Filter>
+    <ClInclude Include="..\Hap\jsmn.h">
+      <Filter>Hap</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="HapTest.cpp" />
-    <ClCompile Include="HapDb.cpp">
-      <Filter>HapDb</Filter>
+    <ClCompile Include="..\Hap\HapDb.cpp">
+      <Filter>Hap</Filter>
     </ClCompile>
-    <ClCompile Include="..\HapDb\jsmn.cpp">
-      <Filter>HapDb</Filter>
+    <ClCompile Include="..\Hap\jsmn.cpp">
+      <Filter>Hap</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

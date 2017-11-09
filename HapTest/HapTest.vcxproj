@@ -151,16 +151,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\HapDb\Hap.h" />
-    <ClInclude Include="..\HapDb\HapAppleCharacteristics.h" />
-    <ClInclude Include="..\HapDb\HapAppleServices.h" />
-    <ClInclude Include="..\HapDb\HapDb.h" />
-    <ClInclude Include="..\HapDb\HapJson.h" />
-    <ClInclude Include="..\HapDb\jsmn.h" />
+    <ClInclude Include="..\Hap\Hap.h" />
+    <ClInclude Include="..\Hap\HapAppleCharacteristics.h" />
+    <ClInclude Include="..\Hap\HapAppleServices.h" />
+    <ClInclude Include="..\Hap\HapDb.h" />
+    <ClInclude Include="..\Hap\HapJson.h" />
+    <ClInclude Include="..\Hap\jsmn.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\HapDb\jsmn.cpp" />
-    <ClCompile Include="HapDb.cpp" />
+    <ClCompile Include="..\Hap\HapDb.cpp" />
+    <ClCompile Include="..\Hap\jsmn.cpp" />
     <ClCompile Include="HapTest.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
