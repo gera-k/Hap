@@ -4,6 +4,9 @@
     <Filter Include="Hap">
       <UniqueIdentifier>{01938fae-a108-4fda-aa5f-5161f7456ef7}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Win">
+      <UniqueIdentifier>{b3f190d9-226d-4175-9708-87951c346c22}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Hap\Hap.h">
@@ -24,6 +27,9 @@
     <ClInclude Include="..\Hap\jsmn.h">
       <Filter>Hap</Filter>
     </ClInclude>
+    <ClInclude Include="..\Hap\HapMdns.h">
+      <Filter>Hap</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="HapTest.cpp" />
@@ -32,6 +38,9 @@
     </ClCompile>
     <ClCompile Include="..\Hap\jsmn.cpp">
       <Filter>Hap</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Win\HapMdns.cpp">
+      <Filter>Win</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

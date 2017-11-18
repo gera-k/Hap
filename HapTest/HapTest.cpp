@@ -2,8 +2,14 @@
 
 #include <tchar.h>
 #include <string>
+#include <iostream>
 
 #include "Hap.h"
+
+static uint16_t swap_16(uint16_t v)
+{
+	return ((v & 0xFF) << 8) | (v >> 8);
+}
 
 class MyLb : public Hap::Lightbulb
 {
@@ -53,10 +59,30 @@ public:
 	}
 } db;
 
+Hap::Config gblCfg =
+{
+	"esp32test",				// const char* name;	// Accessory name - used as initial Bonjour name and as
+								//	Accessory Information Service name of aid=1
+	"Test Model",				// const char* model;	// Model name (Bonjour and AIS)
+	"00:11:22:33:44:55",		// const char* id;		// Device ID (XX:XX:XX:XX:XX:XX, generated new on factory reset)
+	1,							// uint32_t cn;		// Current configuration number, incremented on db change
+	5,							// uint8_t ci;			// category identifier
+	3,							// uint8_t sf;			// status flags
+
+	7889,						// uint16_t port;		// TCP port of HAP service
+
+	0							// bool BCT;			// Bonjour Compatibility Test
+};
+
 int main()
 {
 	char str[256];
 	int l;
+
+	gblCfg.port = swap_16(7889);
+
+	Hap::Mdns* mdns = Hap::Mdns::Create(&gblCfg);
+	mdns->Start();
 
 	db.init(1);
 
@@ -85,6 +111,11 @@ int main()
 	rsp_size = sizeof(rsp);
 	rc = db.getEvents(rsp, rsp_size);
 	Log("Events: %s  rsp %d '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp_size, rsp);
+
+	char c;
+	std::cin >> c;
+
+	mdns->Stop();
 
 	return 0;
 }
