@@ -169,6 +169,7 @@
     <ClInclude Include="..\Hap\HapDb.h" />
     <ClInclude Include="..\Hap\HapJson.h" />
     <ClInclude Include="..\Hap\HapMdns.h" />
+    <ClInclude Include="..\Hap\HapTlv.h" />
     <ClInclude Include="..\Hap\jsmn.h" />
   </ItemGroup>
   <ItemGroup>

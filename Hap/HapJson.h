@@ -142,34 +142,6 @@ namespace Hap
 				return false;
 			}
 
-#if 0
-				if (std::is_integral_v<T>)
-				{
-					if (std::numeric_limits<T>::is_signed)
-					{
-						int64_t v = atoll(copy(i, s, sizeofarr(s)));
-
-						if (v >= std::numeric_limits<T>::min() && v <= std::numeric_limits<T>::max())
-						{
-							value = static_cast<T>(v);
-							return true;
-						}
-					}
-					else
-					{
-						uint64_t v = atoll(copy(i, s, sizeofarr(s)));
-
-						if (v >= std::numeric_limits<T>::min() && v <= std::numeric_limits<T>::max())
-						{
-							value = static_cast<T>(v);
-							return true;
-						}
-					}
-				}
-
-				return false;
-			}
-#endif
 			// copy token i into buffer, zero terminate the buffer
 			char* copy(int i, char* buf, size_t size) const
 			{

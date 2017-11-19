@@ -1719,6 +1719,7 @@ namespace Hap
 					acc->Close(sid);
 			}
 		
+			return true;
 		}
 
 		// get JSON-formatted database
