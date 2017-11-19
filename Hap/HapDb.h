@@ -395,8 +395,10 @@ namespace Hap
 		virtual iid_t getId() { return null_id; }
 		virtual iid_t setId(iid_t iid) { return iid; }
 		virtual bool isType(const char* t) { return false; }
-		virtual int getDb(char* str, int max) = 0;
-		virtual int getEvents(char* str, int max, iid_t aid = 0, iid_t iid = 0) { return 0; }
+		virtual void Open(sid_t sid) {}
+		virtual void Close(sid_t sid) {}
+		virtual int getDb(char* str, int max, sid_t sid) = 0;
+		virtual int getEvents(char* str, int max, sid_t sid, iid_t aid, iid_t iid) { return 0; }
 
 		// parsed parameters of PUT/characteristics request
 		struct wr_prm
@@ -417,7 +419,7 @@ namespace Hap
 
 			Hap::Status status = Hap::Status::Success;
 		};
-		virtual bool Write(wr_prm& p) { return false; };
+		virtual bool Write(wr_prm& p, sid_t sid) { return false; };
 
 		struct rd_prm
 		{
@@ -434,19 +436,23 @@ namespace Hap
 
 			Hap::Status status = Hap::Status::Success;
 		};
-		virtual bool Read(rd_prm& p) { return false; };
+		virtual bool Read(rd_prm& p, sid_t sid) { return false; };
 	};
 
 	class ObjArrayBase
 	{
 	protected:
-		Obj** _obj;			// points to array storage
-		uint8_t _max;		// max number of elements
+		Obj** _obj = NULL;	// points to array storage
+		uint8_t _max = 0;	// max number of elements
 		uint8_t _sz = 0;	// current array size
 
 		ObjArrayBase(Obj** obj, uint8_t max) : _obj(obj), _max(max) {}
 	
 	public:
+		ObjArrayBase()
+		{
+		}
+
 		// return current size of the array
 		uint8_t size() const
 		{
@@ -508,7 +514,7 @@ namespace Hap
 		}
 
 		// getDb - create JSON representation of the array
-		int getDb(char* str, int max, const char* name = nullptr) const
+		int getDb(char* str, int max, sid_t sid, const char* name = nullptr) const
 		{
 			char* s = str;
 			int l;
@@ -537,7 +543,7 @@ namespace Hap
 						if (max <= 0) goto Ret;
 					}
 
-					l = obj->getDb(s, max);
+					l = obj->getDb(s, max, sid);
 					s += l;
 					max -= l;
 					if (max <= 0) goto Ret;
@@ -556,7 +562,7 @@ namespace Hap
 		}
 
 		// getEvents
-		int getEvents(char* str, int max, const char* name = nullptr, iid_t aid = 0, iid_t iid = 0) const
+		int getEvents(char* str, int max, sid_t sid, iid_t aid = 0, iid_t iid = 0, const char* name = nullptr) const
 		{
 			char* s = str;
 			int l;
@@ -586,11 +592,11 @@ namespace Hap
 					}
 
 					if (aid == 0)		// accessories array
-						l = obj->getEvents(s, max, obj->getId());
+						l = obj->getEvents(s, max, sid, obj->getId(), 0);
 					else if (iid == 0)	// services array
-						l = obj->getEvents(s, max, aid, obj->getId());
+						l = obj->getEvents(s, max, sid, aid, obj->getId());
 					else				// characteristics array
-						l = obj->getEvents(s, max, aid, iid);
+						l = obj->getEvents(s, max, sid, aid, iid);
 					s += l;
 					max -= l;
 					if (max <= 0) goto Ret;
@@ -657,11 +663,11 @@ namespace Hap
 			void set(T v) { _v = v; }
 
 			// get JSON-formatted characteristic descriptor
-			virtual int getDb(char* str, int max) override
+			virtual int getDb(char* str, int max, sid_t sid) override
 			{
 				char* s = str;
 				int l;
-					
+
 				if (max <= 0) goto Ret;
 
 				l = snprintf(s, max, "\"%s\":", key());
@@ -774,7 +780,7 @@ namespace Hap
 				return (get() & p) != 0;
 			}
 
-			virtual int getDb(char* str, int max) override
+			virtual int getDb(char* str, int max, sid_t sid) override
 			{
 				static const char* PermStr[] =
 				{
@@ -818,7 +824,65 @@ namespace Hap
 			}
 		};
 
-		using EventNotifications = Simple<KeyId::ev, FormatId::Bool>;
+		class EventNotifications : public Simple<KeyId::ev, FormatId::Bool>
+		{
+		protected:
+			bool _v[sid_max + 1];	// event notification is enabled
+			bool _e[sid_max + 1];	// event notification is pending
+		public:
+			EventNotifications()
+			{}
+
+			T get(sid_t sid) const { return _v[sid]; }
+			void set(T v, sid_t sid) { _v[sid] = v; }
+
+			void SetEvent(bool e = true)
+			{
+				for (int i = 0; i < sizeofarr(_e); i++)
+					if (_v[i])
+						_e[i] = true;
+			}
+			
+			bool GetAndClearEvent(sid_t sid)
+			{
+				bool ret = _e[sid]; 
+				_e[sid] = false; 
+				return ret;
+			}
+
+			virtual void Open(sid_t sid) override
+			{
+				_v[sid] = false;
+				_e[sid] = false;
+			}
+
+			virtual void Close(sid_t sid) override
+			{
+				_v[sid] = false;
+				_e[sid] = false;
+			}
+
+			// get JSON-formatted characteristic descriptor
+			virtual int getDb(char* str, int max, sid_t sid) override
+			{
+				char* s = str;
+				int l;
+
+				if (max <= 0) goto Ret;
+
+				l = snprintf(s, max, "\"%s\":", key());
+				s += l;
+				max -= l;
+				if (max <= 0) goto Ret;
+
+				l = hap_type<FormatId::Bool>::Read(s, max, _v[sid]);
+				s += l;
+				max -= l;
+			Ret:
+				return s - str;
+			}
+		};
+
 		using Description = Simple<KeyId::description, FormatId::ConstStr>;
 		using Format = Simple<KeyId::format, FormatId::Format>;
 		using Unit = Simple<KeyId::unit, FormatId::Unit>;
@@ -845,13 +909,11 @@ namespace Hap
 			Property::Format _format;
 			Property::EventNotifications _ev;	// only valid when _perms contains Events
 
-			bool _event = false;			// when set, event notification is pending TODO: per-session storage 
-
 		protected:
 			void AddProperty(Obj* pr) { _prop.set(pr); }
 
-			void SetEvent(bool e = true) { _event = e; }
-			bool GetAndClearEvent() { bool ret = _event; _event = false; return ret; }
+			void SetEvent(bool e = true) { _ev.SetEvent(e); }
+			bool GetAndClearEvent(sid_t sid) { return _ev.GetAndClearEvent(sid); }
 
 		public:
 			Base(
@@ -886,8 +948,20 @@ namespace Hap
 				return strcmp(t, _type.get()) == 0;
 			}
 
+			virtual void Open(sid_t sid) override
+			{
+				// only per-session characteristic is _ev
+				_ev.Open(sid);
+			}
+
+			virtual void Close(sid_t sid) override
+			{
+				// only per-session characteristic is _ev
+				_ev.Close(sid);
+			}
+
 			// get JSON-formatted characteristic descriptor
-			virtual int getDb(char* str, int max) override
+			virtual int getDb(char* str, int max, sid_t sid) override
 			{
 				char* s = str;
 				int l;
@@ -898,7 +972,7 @@ namespace Hap
 				max--;
 				if (max <= 0) goto Ret;
 
-				l = _prop.getDb(s, max);
+				l = _prop.getDb(s, max, sid);
 				s += l;
 				max -= l;
 				if (max <= 0) goto Ret;
@@ -936,7 +1010,8 @@ namespace Hap
 		// Hap::Characteristic::Simple
 		template<
 			int PropertyCount,				// number of optional properties
-			FormatId F = FormatId::Null		// format of the Value property
+			FormatId F = FormatId::Null,	// format of the Value property
+			bool PerSession = false			// true if per-session value is required
 		>
 		class Simple : public Base<PropertyCount + 1>	// add one slot for the Value property 
 		{
@@ -954,9 +1029,9 @@ namespace Hap
 
 		public:
 			Simple(Hap::Property::Type::T type, Property::Permissions::T perms)
-				: Base<PropertyCount + 1>(type, perms, F)
+				: B(type, perms, F)
 			{
-				Base<PropertyCount + 1>::AddProperty(&_value);
+				B::AddProperty(&_value);
 			}
 
 			// get/set the value
@@ -975,14 +1050,14 @@ namespace Hap
 			void onRead(OnRead h) { _onRead = h; }
 			void onWrite(OnWrite<V> h) { _onWrite = h; }
 
-			virtual int getEvents(char* str, int max, iid_t aid, iid_t iid) override
+			virtual int getEvents(char* str, int max, sid_t sid, iid_t aid, iid_t iid) override
 			{
 				char* s = str;
 				int l;
 
 				if (max <= 0) goto Ret;
 
-				if (B::GetAndClearEvent())
+				if (B::GetAndClearEvent(sid))
 				{
 					*s++ = '{';
 					max--;
@@ -993,7 +1068,7 @@ namespace Hap
 					max -= l;
 					if (max <= 0) goto Ret;
 
-					l = _value.getDb(s, max);
+					l = _value.getDb(s, max, sid);
 					s += l;
 					max -= l;
 
@@ -1003,7 +1078,7 @@ namespace Hap
 				return s - str;
 			}
 
-			virtual bool Write(Obj::wr_prm& p) override
+			virtual bool Write(Obj::wr_prm& p, sid_t sid) override
 			{ 
 				if (p.iid != B::Iid().get())
 				{
@@ -1020,7 +1095,7 @@ namespace Hap
 					}
 					else
 					{
-						B::EventNotifications().set(p.ev_value);
+						B::EventNotifications().set(p.ev_value, sid);
 						if (!p.ev_value)
 							B::SetEvent(false);
 					}
@@ -1065,7 +1140,7 @@ namespace Hap
 				return true;	// true indicates that characteristic was found
 			}
 
-			virtual bool Read(Obj::rd_prm& p) override
+			virtual bool Read(Obj::rd_prm& p, sid_t sid) override
 			{
 				if (p.iid != B::Iid().get())
 				{
@@ -1095,7 +1170,7 @@ namespace Hap
 					p.max--;
 					if (p.max <= 0) return true;
 
-					l = _value.getDb(p.s, p.max);
+					l = _value.getDb(p.s, p.max, sid);
 					p.s += l;
 					p.max -= l;
 					if (p.max <= 0)	return true;
@@ -1110,7 +1185,7 @@ namespace Hap
 					p.max--;
 					if (p.max <= 0) return true;
 
-					l = B::Format().getDb(p.s, p.max);
+					l = B::Format().getDb(p.s, p.max, sid);
 					p.s += l;
 					p.max -= l;
 					if (p.max <= 0)	return true;
@@ -1122,7 +1197,7 @@ namespace Hap
 						p.max--;
 						if (p.max <= 0) return true;
 
-						l = prop->getDb(p.s, p.max);
+						l = prop->getDb(p.s, p.max, sid);
 						p.s += l;
 						p.max -= l;
 						if (p.max <= 0)	return true;
@@ -1135,7 +1210,7 @@ namespace Hap
 						p.max--;
 						if (p.max <= 0) return true;
 
-						l = prop->getDb(p.s, p.max);
+						l = prop->getDb(p.s, p.max, sid);
 						p.s += l;
 						p.max -= l;
 						if (p.max <= 0)	return true;
@@ -1148,7 +1223,7 @@ namespace Hap
 						p.max--;
 						if (p.max <= 0) return true;
 
-						l = prop->getDb(p.s, p.max);
+						l = prop->getDb(p.s, p.max, sid);
 						p.s += l;
 						p.max -= l;
 						if (p.max <= 0)	return true;
@@ -1161,7 +1236,7 @@ namespace Hap
 						p.max--;
 						if (p.max <= 0) return true;
 
-						l = prop->getDb(p.s, p.max);
+						l = prop->getDb(p.s, p.max, sid);
 						p.s += l;
 						p.max -= l;
 						if (p.max <= 0)	return true;
@@ -1174,7 +1249,7 @@ namespace Hap
 						p.max--;
 						if (p.max <= 0) return true;
 
-						l = prop->getDb(p.s, p.max);
+						l = prop->getDb(p.s, p.max, sid);
 						p.s += l;
 						p.max -= l;
 						if (p.max <= 0)	return true;
@@ -1188,7 +1263,7 @@ namespace Hap
 					p.max--;
 					if (p.max <= 0) return true;
 
-					l = B::Perms().getDb(p.s, p.max);
+					l = B::Perms().getDb(p.s, p.max, sid);
 					p.s += l;
 					p.max -= l;
 					if (p.max <= 0)	return true;
@@ -1201,7 +1276,7 @@ namespace Hap
 					p.max--;
 					if (p.max <= 0) return true;
 
-					l = B::Type().getDb(p.s, p.max);
+					l = B::Type().getDb(p.s, p.max, sid);
 					p.s += l;
 					p.max -= l;
 					if (p.max <= 0)	return true;
@@ -1214,7 +1289,7 @@ namespace Hap
 					p.max--;
 					if (p.max <= 0) return true;
 
-					l = B::EventNotifications().getDb(p.s, p.max);
+					l = B::EventNotifications().getDb(p.s, p.max, sid);
 					p.s += l;
 					p.max -= l;
 					if (p.max <= 0)	return true;
@@ -1296,6 +1371,26 @@ namespace Hap
 		}
 
 		// Obj virtual overrides
+		virtual void Open(sid_t sid) override
+		{
+			for (int i = 0; i < _char.size(); i++)
+			{
+				Obj* ch = _char.get(i);
+				if (ch != nullptr)
+					ch->Open(sid);
+			}
+		}
+
+		virtual void Close(sid_t sid) override
+		{
+			for (int i = 0; i < _char.size(); i++)
+			{
+				Obj* ch = _char.get(i);
+				if (ch != nullptr)
+					ch->Close(sid);
+			}
+		}
+
 		virtual iid_t getId() override
 		{
 			return _iid.get();
@@ -1322,7 +1417,7 @@ namespace Hap
 			return strcmp(t, _type.get()) == 0;
 		}
 
-		virtual int getDb(char* str, int max) override
+		virtual int getDb(char* str, int max, sid_t sid) override
 		{
 			char* s = str;
 			int l;
@@ -1333,7 +1428,7 @@ namespace Hap
 			max--;
 			if (max <= 0) goto Ret;
 
-			l = _prop.getDb(s, max);
+			l = _prop.getDb(s, max, sid);
 			s += l;
 			max -= l;
 			if (max <= 0) goto Ret;
@@ -1342,7 +1437,7 @@ namespace Hap
 			max--;
 			if (max <= 0) goto Ret;
 
-			l = _char.getDb(s, max, "characteristics");
+			l = _char.getDb(s, max, sid, "characteristics");
 			s += l;
 			max -= l;
 			if (max <= 0) goto Ret;
@@ -1352,21 +1447,21 @@ namespace Hap
 			return s - str;
 		}
 
-		virtual int getEvents(char* str, int max, iid_t aid, iid_t iid) override
+		virtual int getEvents(char* str, int max, sid_t sid, iid_t aid, iid_t iid) override
 		{
 			char* s = str;
 			int l;
 
 			if (max <= 0) goto Ret;
 
-			l = _char.getEvents(s, max, "characteristics", aid, iid);
+			l = _char.getEvents(s, max, sid, aid, iid, "characteristics");
 			s += l;
 			max -= l;
 		Ret:
 			return s - str;
 		}
 
-		virtual bool Write(wr_prm& p) override
+		virtual bool Write(wr_prm& p, sid_t sid) override
 		{
 			for (int i = 0; i < _char.size(); i++)
 			{
@@ -1376,14 +1471,14 @@ namespace Hap
 
 				if (ch->getId() == p.iid)
 				{
-					return ch->Write(p);
+					return ch->Write(p, sid);
 				}
 			}
 
 			return false;
 		}
 
-		virtual bool Read(rd_prm& p) override
+		virtual bool Read(rd_prm& p, sid_t sid) override
 		{
 			for (int i = 0; i < _char.size(); i++)
 			{
@@ -1393,7 +1488,7 @@ namespace Hap
 
 				if (ch->getId() == p.iid)
 				{
-					return ch->Read(p);
+					return ch->Read(p, sid);
 				}
 			}
 
@@ -1450,7 +1545,27 @@ namespace Hap
 			return _aid.get();
 		}
 
-		virtual int getDb(char* str, int max) override
+		virtual void Open(sid_t sid) override
+		{
+			for (int i = 0; i < _serv.size(); i++)
+			{
+				Obj* serv = _serv.get(i);
+				if (serv != nullptr)
+					serv->Open(sid);
+			}
+		}
+		
+		virtual void Close(sid_t sid) override
+		{
+			for (int i = 0; i < _serv.size(); i++)
+			{
+				Obj* serv = _serv.get(i);
+				if (serv != nullptr)
+					serv->Close(sid);
+			}
+		}
+
+		virtual int getDb(char* str, int max, sid_t sid) override
 		{
 			char* s = str;
 			int l;
@@ -1461,7 +1576,7 @@ namespace Hap
 			max--;
 			if (max <= 0) goto Ret;
 
-			l = _prop.getDb(s, max);
+			l = _prop.getDb(s, max, sid);
 			s += l;
 			max -= l;
 			if (max <= 0) goto Ret;
@@ -1470,7 +1585,7 @@ namespace Hap
 			max--;
 			if (max <= 0) goto Ret;
 
-			l = _serv.getDb(s, max, "services");
+			l = _serv.getDb(s, max, sid, "services");
 			s += l;
 			max -= l;
 			if (max <= 0) goto Ret;
@@ -1480,21 +1595,21 @@ namespace Hap
 			return s - str;
 		}
 
-		virtual int getEvents(char* str, int max, iid_t aid, iid_t iid) override
+		virtual int getEvents(char* str, int max, sid_t sid, iid_t aid, iid_t iid) override
 		{
 			char* s = str;
 			int l;
 
 			if (max <= 0) goto Ret;
 
-			l = _serv.getEvents(s, max, nullptr, aid, iid);
+			l = _serv.getEvents(s, max, sid, aid, iid);
 			s += l;
 			max -= l;
 		Ret:
 			return s - str;
 		}
 
-		virtual bool Write(wr_prm& p) override
+		virtual bool Write(wr_prm& p, sid_t sid) override
 		{
 			if (p.aid != _aid.get())
 			{
@@ -1509,14 +1624,14 @@ namespace Hap
 				if (serv == nullptr)
 					continue;
 
-				if (serv->Write(p))
+				if (serv->Write(p, sid))
 					return true;
 			}
 
 			return false;
 		}
 
-		virtual bool Read(rd_prm& p) override
+		virtual bool Read(rd_prm& p, sid_t sid) override
 		{ 
 			if (p.aid != _aid.get())
 			{
@@ -1531,7 +1646,7 @@ namespace Hap
 				if (serv == nullptr)
 					continue;
 
-				if (serv->Read(p))
+				if (serv->Read(p, sid))
 					return true;
 			}
 
@@ -1540,24 +1655,75 @@ namespace Hap
 	};
 
 	// Hap::Db - top database object, not inherited from Obj
-	template<int AccCount>		// max number of Accessories
+	//	- does not allocate storage for accessories, the storage must be passed into
+	//		constructor; use DbStatic for statically allocate the accessory storage
+	//	- all access to Db object must be externally serialized
 	class Db
 	{
 	private:
-		// array of accessories
-		ObjArrayStatic<AccCount> _acc;
+		ObjArrayBase& _acc;		// array of accessories
+
+		bool sess[sid_max + 1];
 
 	protected:
 		void AddAcc(Obj* acc) {	_acc.set(acc); }
 		Obj* GetAcc(iid_t id) { return _acc.GetObj(id); }
 
 	public:
-		Db()
+		Db(ObjArrayBase& acc)
+			: _acc(acc)
+		{}
+
+		// Open
+		//	returns new session ID, 0..sid_max, or sid_invalid
+		sid_t Open()
 		{
+			for (sid_t sid = 0; sid < sizeofarr(sess); sid++)
+			{
+				if (sess[sid])
+					continue;
+
+				sess[sid] = true;
+
+				// propagate Open down to accessories
+				for (int i = 0; i < _acc.size(); i++)
+				{
+					Obj* acc = _acc.get(i);
+					if (acc != nullptr)
+						acc->Open(sid);
+				}
+
+				return sid;
+			}
+
+			return sid_invalid;
 		}
 
-		//TODO: return HttpStatus get JSON-formatted database
-		int getDb(char* str, int max)
+		// Close
+		//	returns true if opened session was closed
+		bool Close(sid_t sid)
+		{
+			if (sid > sid_max)
+				return false;
+
+			if (!sess[sid])
+				return false;
+
+			sess[sid] = false;
+
+			// propagate Open down to accessories
+			for (int i = 0; i < _acc.size(); i++)
+			{
+				Obj* acc = _acc.get(i);
+				if (acc != nullptr)
+					acc->Close(sid);
+			}
+		
+		}
+
+		// get JSON-formatted database
+		//	returns num of charactes written to str (up to max)
+		int getDb(sid_t sid, char* str, int max)
 		{
 			char* s = str;
 			int l;
@@ -1568,7 +1734,7 @@ namespace Hap
 			max--;
 			if (max <= 0) goto Ret;
 
-			l = _acc.getDb(s, max, "accessories");
+			l = _acc.getDb(s, max, sid, "accessories");
 			s += l;
 			max -= l;
 
@@ -1581,7 +1747,7 @@ namespace Hap
 		//	returns HTTP status and JSON-formatted body for HTTP EVENT
 		//	the rsp_size must be initially set to size of the rsp buffer;
 		//	on return in contains size of the response object, if any 
-		HttpStatus getEvents(char* rsp, int& rsp_size)
+		HttpStatus getEvents(sid_t sid, char* rsp, int& rsp_size)
 		{
 			char* s = rsp;
 			int l, max = rsp_size;
@@ -1593,7 +1759,7 @@ namespace Hap
 			if (max <= 0)
 				return HTTP_500;	// Internal error
 
-			l = _acc.getEvents(s, max);
+			l = _acc.getEvents(s, max, sid);
 			s += l;
 			max -= l;
 			if (max <= 0)
@@ -1614,7 +1780,7 @@ namespace Hap
 		//	returns HTTP status and JSON-formatted body for HTTP response
 		//	the rsp_size must be initially set to size of the rsp buffer;
 		//	on return in contains size of the response object, if any 
-		HttpStatus Write(const char* req, int req_length, char* rsp, int& rsp_size)
+		HttpStatus Write(sid_t sid, const char* req, int req_length, char* rsp, int& rsp_size)
 		{
 			int l, max = rsp_size;
 			Hap::Json::Parser<> wr;
@@ -1755,7 +1921,7 @@ namespace Hap
 				}
 				else
 				{
-					if (!acc->Write(p))
+					if (!acc->Write(p, sid))
 						p.status = Hap::Status::ResourceNotExist;
 				}
 
@@ -1805,7 +1971,7 @@ namespace Hap
 		//	returns HTTP status and JSON-formatted body for HTTP response
 		//	the rsp_size must be initially set to size of the rsp buffer;
 		//	on return in contains size of the response object, if any 
-		HttpStatus Read(const char* req, int req_length, char* rsp, int& rsp_size)
+		HttpStatus Read(sid_t sid, const char* req, int req_length, char* rsp, int& rsp_size)
 		{
 			Obj::rd_prm p;
 			const char* r = req;
@@ -2000,7 +2166,7 @@ namespace Hap
 					}
 					else
 					{
-						if (!acc->Read(p))
+						if (!acc->Read(p, sid))
 							p.status = Hap::Status::ResourceNotExist;
 					}
 
@@ -2051,6 +2217,17 @@ namespace Hap
 
 			return HTTP_207;	// Multi-status
 		}
+	};
+
+	template<int AccCount>		// max number of Accessories
+	class DbStatic : public Db
+	{
+	private:
+		ObjArrayStatic<AccCount> _acc;
+	public:
+		DbStatic() 
+			: Db(_acc) 
+		{}
 	};
 }
 

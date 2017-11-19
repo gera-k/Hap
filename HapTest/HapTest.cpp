@@ -37,7 +37,7 @@ public:
 	}
 };
 
-class MyDb : public Hap::Db<1>
+class MyDb : public Hap::DbStatic<1>
 {
 private:
 	MyAcc acc;
@@ -81,12 +81,14 @@ int main()
 
 	gblCfg.port = swap_16(7889);
 
-	Hap::Mdns* mdns = Hap::Mdns::Create(&gblCfg);
-	mdns->Start();
+//	Hap::Mdns* mdns = Hap::Mdns::Create(&gblCfg);
+//	mdns->Start();
 
 	db.init(1);
 
-	l = db.getDb(str, sizeof(str) - 1);
+	Hap::sid_t sid = db.Open();
+
+	l = db.getDb(sid, str, sizeof(str) - 1);
 	str[l] = 0;
 	printf("sizeof(srv)=%d  db '%s'\n",
 		sizeof(db), str);
@@ -96,26 +98,27 @@ int main()
 	char rsp[256];
 	int rsp_size = sizeof(rsp);
 
-	auto rc = db.Write(wr, sizeof(wr)-1, rsp, rsp_size);
+	auto rc = db.Write(sid, wr, sizeof(wr)-1, rsp, rsp_size);
 	Log("Write: %s  rsp '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp);
 
 	const char rd[] = "id=1.2,3.1&ev=1&meta=1&perms=1&type=1";
 	rsp_size = sizeof(rsp);
-	rc = db.Read(rd, sizeof(rd)-1, rsp, rsp_size);
+	rc = db.Read(sid, rd, sizeof(rd)-1, rsp, rsp_size);
 	Log("Read: %s  rsp '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp);
 
 	rsp_size = sizeof(rsp);
-	rc = db.getEvents(rsp, rsp_size);
+	rc = db.getEvents(sid, rsp, rsp_size);
 	Log("Events: %s  rsp %d '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp_size, rsp);
 
 	rsp_size = sizeof(rsp);
-	rc = db.getEvents(rsp, rsp_size);
+	rc = db.getEvents(sid, rsp, rsp_size);
 	Log("Events: %s  rsp %d '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp_size, rsp);
 
-	char c;
-	std::cin >> c;
+	db.Close(sid);
 
-	mdns->Stop();
+//	char c;
+//	std::cin >> c;
+//	mdns->Stop();
 
 	return 0;
 }

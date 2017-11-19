@@ -27,6 +27,13 @@ namespace Hap
 
 		bool BCT;			// Bonjour Compatibility Test
 	};
+
+	// HAP session ID
+	//	some DB characteristics and methods depend on HAP session context
+	//	example - Event Notification state and pending events
+	using sid_t = uint8_t;
+	constexpr sid_t sid_invalid = 0xFF;
+	constexpr sid_t sid_max = 7;		// up to 8 sessions, sid_t = 0..7 (5.2.3 TCP requirements)
 }
 
 #include "HapMdns.h"

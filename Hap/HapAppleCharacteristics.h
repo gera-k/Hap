@@ -13,8 +13,6 @@ namespace Hap
 		//	Format bool
 		class On : public Simple< 1, FormatId::Bool >
 		{
-		protected:
-			Hap::Property::EventNotifications ev;
 		public:
 			static constexpr const char* Type = "25";
 
@@ -25,7 +23,6 @@ namespace Hap
 				Hap::Property::Permissions::Events
 			)
 			{
-				AddProperty(&ev);
 				Value(value);
 			}
 
