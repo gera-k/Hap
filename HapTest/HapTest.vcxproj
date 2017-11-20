@@ -167,14 +167,18 @@
     <ClInclude Include="..\Hap\HapAppleCharacteristics.h" />
     <ClInclude Include="..\Hap\HapAppleServices.h" />
     <ClInclude Include="..\Hap\HapDb.h" />
+    <ClInclude Include="..\Hap\HapHttp.h" />
     <ClInclude Include="..\Hap\HapJson.h" />
     <ClInclude Include="..\Hap\HapMdns.h" />
     <ClInclude Include="..\Hap\HapTlv.h" />
     <ClInclude Include="..\Hap\jsmn.h" />
+    <ClInclude Include="..\Hap\picohttpparser.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Hap\HapDb.cpp" />
+    <ClCompile Include="..\Hap\HapHttp.cpp" />
     <ClCompile Include="..\Hap\jsmn.cpp" />
+    <ClCompile Include="..\Hap\picohttpparser.cpp" />
     <ClCompile Include="..\Win\HapMdns.cpp" />
     <ClCompile Include="HapTest.cpp" />
   </ItemGroup>

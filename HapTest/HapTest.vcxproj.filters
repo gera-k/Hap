@@ -33,6 +33,12 @@
     <ClInclude Include="..\Hap\HapTlv.h">
       <Filter>Hap</Filter>
     </ClInclude>
+    <ClInclude Include="..\Hap\HapHttp.h">
+      <Filter>Hap</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\picohttpparser.h">
+      <Filter>Hap</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="HapTest.cpp" />
@@ -44,6 +50,12 @@
     </ClCompile>
     <ClCompile Include="..\Win\HapMdns.cpp">
       <Filter>Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\picohttpparser.cpp">
+      <Filter>Hap</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\HapHttp.cpp">
+      <Filter>Hap</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

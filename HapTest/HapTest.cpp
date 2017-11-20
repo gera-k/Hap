@@ -74,6 +74,8 @@ Hap::Config gblCfg =
 	0							// bool BCT;			// Bonjour Compatibility Test
 };
 
+Hap::Http::Server srv(db);
+
 int main()
 {
 	char str[256];
@@ -86,39 +88,58 @@ int main()
 
 	db.init(1);
 
-	Hap::sid_t sid = db.Open();
+	Hap::sid_t sid = srv.Open();
 
 	l = db.getDb(sid, str, sizeof(str) - 1);
 	str[l] = 0;
 	printf("sizeof(srv)=%d  db '%s'\n",
 		sizeof(db), str);
 
-	const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":2,\"value\":true,\"ev\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
+	static const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":2,\"value\":true,\"ev\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
 //	const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":8,\"value\":true}]}";
-	char rsp[256];
+	static char rsp[256];
 	int rsp_size = sizeof(rsp);
 
 	auto rc = db.Write(sid, wr, sizeof(wr)-1, rsp, rsp_size);
-	Log("Write: %s  rsp '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp);
+	Log("Write: %s  rsp '%.*s'\n", Hap::Http::StatusStr(rc), rsp_size, rsp);
 
-	const char rd[] = "id=1.2,3.1&ev=1&meta=1&perms=1&type=1";
+	static const char rd[] = "id=1.2,3.1&ev=1&meta=1&perms=1&type=1";
 	rsp_size = sizeof(rsp);
 	rc = db.Read(sid, rd, sizeof(rd)-1, rsp, rsp_size);
-	Log("Read: %s  rsp '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp);
+	Log("Read: %s  rsp '%.*s'\n", Hap::Http::StatusStr(rc), rsp_size, rsp);
 
 	rsp_size = sizeof(rsp);
 	rc = db.getEvents(sid, rsp, rsp_size);
-	Log("Events: %s  rsp %d '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp_size, rsp);
+	Log("Events: %s  rsp %d '%.*s'\n", Hap::Http::StatusStr(rc), rsp_size, rsp_size, rsp);
 
 	rsp_size = sizeof(rsp);
 	rc = db.getEvents(sid, rsp, rsp_size);
-	Log("Events: %s  rsp %d '%.*s'\n", Hap::HttpStatusStr(rc), rsp_size, rsp_size, rsp);
-
-	db.Close(sid);
+	Log("Events: %s  rsp %d '%.*s'\n", Hap::Http::StatusStr(rc), rsp_size, rsp_size, rsp);
 
 //	char c;
 //	std::cin >> c;
 //	mdns->Stop();
+
+	srv.Process(sid, nullptr,
+	[](Hap::sid_t sid, void* ctx, uint8_t* buf, uint16_t& size) -> bool {
+
+		static bool first = true;
+		static const char req[] = "";
+
+		if (first)
+		{
+			size = sizeof(req);
+			memcpy(buf, req, size);
+			first = false;
+			return true;
+		}
+		return false;
+	},
+	[](Hap::sid_t sid, void* ctx, uint8_t* buf, uint16_t len, bool close) -> bool {
+		return true;
+	});
+
+	srv.Close(sid);
 
 	return 0;
 }

@@ -42,33 +42,6 @@ namespace Hap
 		return str[int(c)];
 	}
 
-	enum HttpStatus
-	{
-		HTTP_200,
-		HTTP_204,
-		HTTP_207,
-		HTTP_400,
-		HTTP_404,
-		HTTP_422,
-		HTTP_500,
-		HTTP_503
-	};
-	static const char* HttpStatusStr(HttpStatus c)
-	{
-		static const char* const str[] =
-		{
-			"200 OK",
-			"204 No Content",
-			"207 Multi-Status",
-			"400 Bad Request",
-			"404 Not Found",
-			"422 Unprocessable Entry",
-			"500 Internal Server Error",
-			"503 Service Unavailable",
-		};
-		return str[int(c)];
-	}
-
 	// 'unit' enumerator values and string representations
 	enum class UnitId : uint8_t
 	{
@@ -1663,8 +1636,6 @@ namespace Hap
 	private:
 		ObjArrayBase& _acc;		// array of accessories
 
-		bool sess[sid_max + 1];
-
 	protected:
 		void AddAcc(Obj* acc) {	_acc.set(acc); }
 		Obj* GetAcc(iid_t id) { return _acc.GetObj(id); }
@@ -1674,52 +1645,28 @@ namespace Hap
 			: _acc(acc)
 		{}
 
-		// Open
-		//	returns new session ID, 0..sid_max, or sid_invalid
-		sid_t Open()
+		void Open(sid_t sid)
 		{
-			for (sid_t sid = 0; sid < sizeofarr(sess); sid++)
+			// propagate Open down to accessories
+			for (int i = 0; i < _acc.size(); i++)
 			{
-				if (sess[sid])
-					continue;
-
-				sess[sid] = true;
-
-				// propagate Open down to accessories
-				for (int i = 0; i < _acc.size(); i++)
-				{
-					Obj* acc = _acc.get(i);
-					if (acc != nullptr)
-						acc->Open(sid);
-				}
-
-				return sid;
+				Obj* acc = _acc.get(i);
+				if (acc != nullptr)
+					acc->Open(sid);
 			}
-
-			return sid_invalid;
 		}
 
 		// Close
 		//	returns true if opened session was closed
-		bool Close(sid_t sid)
+		void Close(sid_t sid)
 		{
-			if (sid > sid_max)
-				return false;
-
-			if (!sess[sid])
-				return false;
-
-			sess[sid] = false;
-
-			// propagate Open down to accessories
+			// propagate Close down to accessories
 			for (int i = 0; i < _acc.size(); i++)
 			{
 				Obj* acc = _acc.get(i);
 				if (acc != nullptr)
 					acc->Close(sid);
 			}
-		
-			return true;
 		}
 
 		// get JSON-formatted database
@@ -1748,7 +1695,7 @@ namespace Hap
 		//	returns HTTP status and JSON-formatted body for HTTP EVENT
 		//	the rsp_size must be initially set to size of the rsp buffer;
 		//	on return in contains size of the response object, if any 
-		HttpStatus getEvents(sid_t sid, char* rsp, int& rsp_size)
+		Http::Status getEvents(sid_t sid, char* rsp, int& rsp_size)
 		{
 			char* s = rsp;
 			int l, max = rsp_size;
@@ -1758,22 +1705,22 @@ namespace Hap
 			*s++ = '{';
 			max--;
 			if (max <= 0)
-				return HTTP_500;	// Internal error
+				return Http::HTTP_500;	// Internal error
 
 			l = _acc.getEvents(s, max, sid);
 			s += l;
 			max -= l;
 			if (max <= 0)
-				return HTTP_500;	// Internal error
+				return Http::HTTP_500;	// Internal error
 
 			*s++ = '}';
 			max--;
 			if (max <= 0)
-				return HTTP_500;	// Internal error
+				return Http::HTTP_500;	// Internal error
 
 			rsp_size = s - rsp;
 
-			return HTTP_200;
+			return Http::HTTP_200;
 		}
 
 		// exec PUT/characteristics request
@@ -1781,7 +1728,7 @@ namespace Hap
 		//	returns HTTP status and JSON-formatted body for HTTP response
 		//	the rsp_size must be initially set to size of the rsp buffer;
 		//	on return in contains size of the response object, if any 
-		HttpStatus Write(sid_t sid, const char* req, int req_length, char* rsp, int& rsp_size)
+		Http::Status Write(sid_t sid, const char* req, int req_length, char* rsp, int& rsp_size)
 		{
 			int l, max = rsp_size;
 			Hap::Json::Parser<> wr;
@@ -1795,7 +1742,7 @@ namespace Hap
 			if (!rc || wr.tk(0)->type != Hap::Json::JSMN_OBJECT)
 			{
 				Log("JSON parse error\n");
-				return HTTP_400;	// Bad request
+				return Http::HTTP_400;	// Bad request
 			}
 
 			wr.dump();
@@ -1809,7 +1756,7 @@ namespace Hap
 			if (rc >= 0)
 			{
 				Log("parameter '%s' is missing or invalid", om[rc].key);
-				return HTTP_400;
+				return Http::HTTP_400;
 			}
 
 			int cnt = wr.tk(om[0].i)->size;
@@ -1824,7 +1771,7 @@ namespace Hap
 			s += l;
 			max -= l;
 			if (max <= 0)
-				return HTTP_500;	// Internal error
+				return Http::HTTP_500;	// Internal error
 
 			// parse and execute individual writes
 			for (int i = 0; i < cnt; i++)
@@ -1834,13 +1781,13 @@ namespace Hap
 				if (c < 0)
 				{
 					Log("Characteristic %d not found\n", i);
-					return HTTP_400;
+					return Http::HTTP_400;
 				}
 
 				if (wr.tk(c)->type != Hap::Json::JSMN_OBJECT)
 				{
 					Log("Characteristic %d: Object expected\n", i);
-					return HTTP_400;
+					return Http::HTTP_400;
 				}
 
 				// parse characteristic object
@@ -1858,7 +1805,7 @@ namespace Hap
 				if (rc >= 0)
 				{
 					Log("Characteristic %d: parameter '%s' is missing or invalid", i, om[rc].key);
-					return HTTP_400;
+					return Http::HTTP_400;
 				}
 
 				// fill write request parameters and status
@@ -1868,14 +1815,14 @@ namespace Hap
 				if (!wr.is_number<Hap::iid_t>(om[0].i, p.aid))
 				{
 					Log("Characteristic %d: invalid aid\n", i);
-					return HTTP_400;
+					return Http::HTTP_400;
 				}
 
 				// iid
 				if (!wr.is_number<Hap::iid_t>(om[1].i, p.iid))
 				{
 					Log("Characteristic %d: invalid iid\n", i);
-					return HTTP_400;
+					return Http::HTTP_400;
 				}
 
 				// value
@@ -1934,7 +1881,7 @@ namespace Hap
 					*s++ = ',';
 					max--;
 					if (max <= 0)
-						return HTTP_500;	// Internal error
+						return Http::HTTP_500;	// Internal error
 				}
 
 				l = snprintf(s, max, "{\"aid\":%d,\"iid\":%d,\"status\":%s}",
@@ -1942,7 +1889,7 @@ namespace Hap
 				s += l;
 				max -= l;
 				if (max <= 0)
-					return HTTP_500;	// Internal error
+					return Http::HTTP_500;	// Internal error
 				comma = true;
 
 			}
@@ -1951,20 +1898,20 @@ namespace Hap
 			s += l;
 			max -= l;
 			if (max <= 0)
-				return HTTP_500;	// Internal error
+				return Http::HTTP_500;	// Internal error
 
 			if (errcnt == 0)
 			{
 				rsp_size = 0;
-				return HTTP_204;	// No content
+				return Http::HTTP_204;	// No content
 			}
 
 			rsp_size = s - rsp;
 
 			if (cnt == errcnt)		// all writes completed with error
-				return HTTP_400;	// bad request
+				return Http::HTTP_400;	// bad request
 
-			return HTTP_207;	// Multi-status
+			return Http::HTTP_207;	// Multi-status
 		}
 		
 		// exec GET/characteristics request
@@ -1972,7 +1919,7 @@ namespace Hap
 		//	returns HTTP status and JSON-formatted body for HTTP response
 		//	the rsp_size must be initially set to size of the rsp buffer;
 		//	on return in contains size of the response object, if any 
-		HttpStatus Read(sid_t sid, const char* req, int req_length, char* rsp, int& rsp_size)
+		Http::Status Read(sid_t sid, const char* req, int req_length, char* rsp, int& rsp_size)
 		{
 			Obj::rd_prm p;
 			const char* r = req;
@@ -1990,7 +1937,7 @@ namespace Hap
 					r += 3;
 					l -= 3;
 					if (l <= 0)
-						return HTTP_400;	// bad request
+						return Http::HTTP_400;	// bad request
 
 					id = r;
 					bool loop = true;
@@ -2024,7 +1971,7 @@ namespace Hap
 							break;
 
 						default:
-							return HTTP_400;	// unexpected character - bad request
+							return Http::HTTP_400;	// unexpected character - bad request
 						}
 					}
 
@@ -2034,11 +1981,11 @@ namespace Hap
 					r += 5;
 					l -= 5;
 					if (l <= 0)
-						return HTTP_400;
+						return Http::HTTP_400;
 					if (*r == '1')
 						p.meta = true;
 					else if (*r != '0')
-						return HTTP_400;
+						return Http::HTTP_400;
 					r++;
 					l--;
 				}
@@ -2047,11 +1994,11 @@ namespace Hap
 					r += 6;
 					l -= 6;
 					if (l <= 0)
-						return HTTP_400;
+						return Http::HTTP_400;
 					if (*r == '1')
 						p.perms = true;
 					else if (*r != '0')
-						return HTTP_400;
+						return Http::HTTP_400;
 					r++;
 					l--;
 				}
@@ -2060,11 +2007,11 @@ namespace Hap
 					r += 5;
 					l -= 5;
 					if (l <= 0)
-						return HTTP_400;
+						return Http::HTTP_400;
 					if (*r == '1')
 						p.type = true;
 					else if (*r != '0')
-						return HTTP_400;
+						return Http::HTTP_400;
 					r++;
 					l--;
 				}
@@ -2073,19 +2020,19 @@ namespace Hap
 					r += 3;
 					l -= 3;
 					if (l <= 0)
-						return HTTP_400;
+						return Http::HTTP_400;
 					if (*r == '1')
 						p.ev = true;
 					else if (*r != '0')
-						return HTTP_400;
+						return Http::HTTP_400;
 					r++;
 					l--;
 				}
 				else
-					return HTTP_400;
+					return Http::HTTP_400;
 
 				if (l > 0 && *r != '&' && *r != ';' && *r != '#')
-					return HTTP_400;
+					return Http::HTTP_400;
 
 				r++;
 				l--;
@@ -2094,7 +2041,7 @@ namespace Hap
 			Log("Read: '%.*s' meta %d  perms %d  type %d  ev %d\n", id_length, id, p.meta, p.perms, p.type, p.ev);
 
 			if (id_length == 0)
-				return HTTP_400;	// id mus be present
+				return Http::HTTP_400;	// id mus be present
 
 			// prepare response
 			char* s = rsp;
@@ -2104,7 +2051,7 @@ namespace Hap
 			l = snprintf(s, max, "{\"characteristics\":[");
 			s += l;
 			max -= l;
-			if (max <= 0) return HTTP_500;
+			if (max <= 0) return Http::HTTP_500;
 
 
 			// parse id list and call read on each characteristic
@@ -2121,7 +2068,7 @@ namespace Hap
 						continue;
 					}
 					else if (*id++ != '.')
-						return HTTP_400;
+						return Http::HTTP_400;
 
 					id_length--;
 					read_aid = false;
@@ -2137,7 +2084,7 @@ namespace Hap
 							continue;
 					}
 					else if (id_length > 0 && *id++ != ',')
-						return HTTP_400;
+						return Http::HTTP_400;
 
 					id_length--;
 					read_aid = true;
@@ -2148,13 +2095,13 @@ namespace Hap
 					{
 						*s++ = ',';
 						max--;
-						if (max <= 0) return HTTP_500;
+						if (max <= 0) return Http::HTTP_500;
 					}
 
 					l = snprintf(s, max, "{\"aid\":%d,\"iid\":%d", p.aid, p.iid);
 					s += l;
 					max -= l;
-					if (max <= 0) return HTTP_500;
+					if (max <= 0) return Http::HTTP_500;
 
 					p.s = s;
 					p.max = max;
@@ -2173,7 +2120,7 @@ namespace Hap
 
 					s = p.s;
 					max = p.max;
-					if (max <= 0) return HTTP_500;
+					if (max <= 0) return Http::HTTP_500;
 
 					if (p.status != Hap::Status::Success)
 					{
@@ -2181,18 +2128,18 @@ namespace Hap
 
 						*s++ = ',';
 						max--;
-						if (max <= 0) return HTTP_500;
+						if (max <= 0) return Http::HTTP_500;
 
 						l = snprintf(s, max, "\"status\":%s}", StatusStr(p.status));
 						s += l;
 						max -= l;
-						if (max <= 0) return HTTP_500;
+						if (max <= 0) return Http::HTTP_500;
 					}
 					else
 					{
 						*s++ = '}';
 						max--;
-						if (max <= 0) return HTTP_500;
+						if (max <= 0) return Http::HTTP_500;
 					}
 
 					acccnt++;
@@ -2206,17 +2153,17 @@ namespace Hap
 			s += l;
 			max -= l;
 			if (max <= 0)
-				return HTTP_500;	// Internal error
+				return Http::HTTP_500;	// Internal error
 
 			rsp_size = s - rsp;
 
 			if (errcnt == 0)
-				return HTTP_200;	// OK
+				return Http::HTTP_200;	// OK
 
 			if (acccnt == errcnt)	// all reads completed with error
-				return HTTP_400;	// bad request
+				return Http::HTTP_400;	// bad request
 
-			return HTTP_207;	// Multi-status
+			return Http::HTTP_207;	// Multi-status
 		}
 	};
 

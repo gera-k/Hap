@@ -80,7 +80,7 @@ namespace Hap
 				if (i >= _cnt)
 					return Type::Invalid;
 
-				return Type(buf[off[i]]);
+				return Type(_buf[_off[i]]);
 			}
 
 			uint8_t length(uint8_t i)
@@ -88,7 +88,7 @@ namespace Hap
 				if (i >= _cnt)
 					return 0;
 
-				return buf[off[i] + 1];
+				return _buf[_off[i] + 1];
 			}
 
 			uint8_t* value(uint8_t i)
@@ -96,7 +96,7 @@ namespace Hap
 				if (i >= _cnt)
 					return 0;
 
-				return buf + off[i] + 2;
+				return _buf + _off[i] + 2;
 			}
 
 			// extract low-endian integer value
@@ -113,10 +113,10 @@ namespace Hap
 			}
 
 			// extract data bytes from single TLV
-			//	the d buffer must be at least length(i) bytes long
-			void getBytes(uint8_t i, uint8_t* d)
+			//	the data buffer must be at least length(i) bytes long
+			void getBytes(uint8_t i, uint8_t* data)
 			{
-				memcpy(b, value(i), length(i));
+				memcpy(data, value(i), length(i));
 			}
 
 			// extract multi-TLV data starting from TLV i
@@ -208,7 +208,7 @@ namespace Hap
 			}
 
 			// Add data, span multiple TLVs as necessary
-			bool addData(Type t, uint8_t* data, uint8_t len)
+			bool addData(Type t, uint8_t* data, uint16_t len)
 			{
 				uint8_t* d = data;
 

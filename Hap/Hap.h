@@ -13,7 +13,13 @@
 
 namespace Hap
 {
-	struct Config		// global configuration, persistent across reboots
+	// global constants
+	constexpr uint8_t MaxHttpSessions = 8;					// max HTTP sessions (5.2.3 TCP requirements)
+	constexpr uint8_t MaxHttpHeaders = 20;					// max number of HTTP headers in request
+	constexpr uint16_t MaxHttpFrame = 2 + 1024 + 16;		// max HTTP frame - fits max single encrypted frame (5.5.2 Session securiry)
+
+	// global configuration, persistent across reboots
+	struct Config		
 	{
 		const char* name;	// Accessory name - used as initial Bonjour name and as
 							//	Accessory Information Service name of aid=1
@@ -33,12 +39,16 @@ namespace Hap
 	//	example - Event Notification state and pending events
 	using sid_t = uint8_t;
 	constexpr sid_t sid_invalid = 0xFF;
-	constexpr sid_t sid_max = 7;		// up to 8 sessions, sid_t = 0..7 (5.2.3 TCP requirements)
+	constexpr sid_t sid_max = MaxHttpSessions - 1;
+
+	// forward declarations
+	class Db;
 }
 
 #include "HapMdns.h"
 #include "HapJson.h"
 #include "HapTlv.h"
+#include "HapHttp.h"
 #include "HapDb.h"
 #include "HapAppleCharacteristics.h"
 #include "HapAppleServices.h"
