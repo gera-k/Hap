@@ -46,7 +46,7 @@ namespace Hap
 			sid_t sid,
 			void* ctx,
 			std::function<bool(sid_t sid, void* ctx, uint8_t* buf, uint16_t& size)> recv,
-			std::function<bool(sid_t sid, void* ctx, uint8_t* buf, uint16_t len, bool close)> send
+			std::function<bool(sid_t sid, void* ctx, uint8_t* buf, uint16_t len)> send
 		)
 		{
 			if (sid > MaxHttpSessions)	// invalid sid
@@ -58,8 +58,8 @@ namespace Hap
 			if (sid == MaxHttpSessions)	// too many sessions
 			{
 				// TODO: read request, create error response
-				send(sid, ctx, sess->rsp, rsp_len, true);
-				return true;
+				send(sid, ctx, sess->rsp, rsp_len);
+				return false;
 			}
 
 			_reqp.init();
@@ -74,8 +74,8 @@ namespace Hap
 				if (!recv(sid, ctx, req, req_len))	// read error
 				{
 					// TODO: make response Internal server error
-					send(sid, ctx, sess->rsp, rsp_len, true);
-					return true;
+					send(sid, ctx, sess->rsp, rsp_len);
+					return false;
 				}
 
 				len += req_len;
@@ -85,8 +85,8 @@ namespace Hap
 				if (status == _reqp.Error)	// parser error
 				{
 					// TODO: make response Internal server error
-					send(sid, ctx, sess->rsp, rsp_len, true);
-					return true;
+					send(sid, ctx, sess->rsp, rsp_len);
+					return false;
 				}
 
 				if (status == _reqp.Success)
@@ -95,7 +95,7 @@ namespace Hap
 				// request incomplete - try reading more data
 			}
 
-			send(sid, ctx, sess->rsp, rsp_len, true);
+			send(sid, ctx, sess->rsp, rsp_len);
 			return true;
 		}
 

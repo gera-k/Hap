@@ -49,6 +49,7 @@ namespace Hap
 #include "HapJson.h"
 #include "HapTlv.h"
 #include "HapHttp.h"
+#include "HapTcp.h"
 #include "HapDb.h"
 #include "HapAppleCharacteristics.h"
 #include "HapAppleServices.h"

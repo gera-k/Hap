@@ -141,13 +141,12 @@ namespace Hap
 			//		- calls 'send' to send the response back, close flag is set when the TCP session 
 			//			must be disconnected after sending the response
 			//		-	returns true after calling 'send', no matter if there was HTTP error or not
-			//		-	returns false when it's unable to create any response so the caller must just
-			//			disconnect the TCP session
+			//		-	returns false the caller close the TCP session
 			bool Process(
 				sid_t sid,		// session ID returned from Open
 				void* ctx,		// caller context, passed back in recv and send callbacks
 				std::function<bool(sid_t sid, void* ctx, uint8_t* buf, uint16_t& size)> recv,
-				std::function<bool(sid_t sid, void* ctx, uint8_t* buf, uint16_t len, bool close)> send
+				std::function<bool(sid_t sid, void* ctx, uint8_t* buf, uint16_t len)> send
 			);
 		};
 	}

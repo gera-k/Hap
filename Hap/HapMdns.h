@@ -59,6 +59,11 @@ namespace Hap
 			p += l;
 
 			// pv - protocol version, requred if not 1.0
+			l = snprintf(p + 1, max, "pv=1.0");
+			max -= l;
+			if (max <= 0) goto Ret;
+			*p++ = l;
+			p += l;
 
 			// s# - current state number, must be 1
 			l = snprintf(p + 1, max, "s#=1");

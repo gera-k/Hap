@@ -74,21 +74,25 @@ Hap::Config gblCfg =
 	0							// bool BCT;			// Bonjour Compatibility Test
 };
 
-Hap::Http::Server srv(db);
+Hap::Http::Server http(db);
 
 int main()
 {
-	char str[256];
-	int l;
-
 	gblCfg.port = swap_16(7889);
 
-//	Hap::Mdns* mdns = Hap::Mdns::Create(&gblCfg);
-//	mdns->Start();
+	Hap::Mdns* mdns = Hap::Mdns::Create(&gblCfg);
+	Hap::Tcp* tcp = Hap::Tcp::Create(&gblCfg, &http);
 
 	db.init(1);
 
-	Hap::sid_t sid = srv.Open();
+	mdns->Start();
+	tcp->Start();
+
+#if 0
+//	Hap::sid_t sid = srv.Open();
+
+	char str[256];
+	int l;
 
 	l = db.getDb(sid, str, sizeof(str) - 1);
 	str[l] = 0;
@@ -116,10 +120,16 @@ int main()
 	rc = db.getEvents(sid, rsp, rsp_size);
 	Log("Events: %s  rsp %d '%.*s'\n", Hap::Http::StatusStr(rc), rsp_size, rsp_size, rsp);
 
-//	char c;
-//	std::cin >> c;
-//	mdns->Stop();
+	tcpServer();
+#else
+	char c;
+	std::cin >> c;
+#endif
 
+	tcp->Stop();
+	mdns->Stop();
+
+#if 0
 	srv.Process(sid, nullptr,
 	[](Hap::sid_t sid, void* ctx, uint8_t* buf, uint16_t& size) -> bool {
 
@@ -140,6 +150,7 @@ int main()
 	});
 
 	srv.Close(sid);
+#endif
 
 	return 0;
 }
