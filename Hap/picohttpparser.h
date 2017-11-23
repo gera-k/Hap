@@ -1,3 +1,5 @@
+// derived from https://github.com/h2o/picohttpparser
+
 /*
  * Copyright (c) 2009-2014 Kazuho Oku, Tokuhiro Matsuno, Daisuke Murase,
  *                         Shigeo Mitsunari
@@ -33,11 +35,13 @@
 #define ssize_t intptr_t
 #endif
 
+namespace Hap {	namespace Http {
+
 /* $Id: 67fd3ee74103ada60258d8a16e868f483abcca87 $ */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+//#ifdef __cplusplus
+//extern "C" {
+//#endif
 
 /* contains name and value of a header (name == NULL if is a continuing line
  * of a multiline header */
@@ -82,8 +86,10 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_
 /* returns if the chunked decoder is in middle of chunked data */
 int phr_decode_chunked_is_in_data(struct phr_chunked_decoder *decoder);
 
-#ifdef __cplusplus
-}
-#endif
+//#ifdef __cplusplus
+//}
+//#endif
+
+} }
 
 #endif

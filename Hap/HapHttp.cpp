@@ -95,6 +95,19 @@ namespace Hap
 				// request incomplete - try reading more data
 			}
 
+			auto m = _reqp.method();
+			Log("Method: '%.*s'\n", m.second, m.first);
+
+			auto p = _reqp.path();
+			Log("Path: '%.*s'\n", p.second, p.first);
+
+			for (size_t i = 0; i < _reqp.hdr_count(); i++)
+			{
+				auto n = _reqp.hdr_name(i);
+				auto v = _reqp.hdr_value(i);
+				Log("%.*s: '%.*s'\n", n.second, n.first, v.second, v.first);
+			}
+
 			send(sid, ctx, sess->rsp, rsp_len);
 			return true;
 		}

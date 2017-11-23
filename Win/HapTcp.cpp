@@ -4,6 +4,8 @@
 #include <mutex>
 #include <condition_variable>
 
+#include <io.h>
+#include <fcntl.h>
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include "winsock2.h"
 
@@ -13,8 +15,6 @@ namespace Hap
 	{
 	private:
 		std::thread task;
-		std::mutex mtx;
-		std::condition_variable cv;
 		bool running = false;
 
 		SOCKET server;
@@ -169,6 +169,15 @@ namespace Hap
 				}
 			}
 
+			for (int i = 0; i < sizeofarr(client); i++)
+			{
+				SOCKET sd = client[i];
+				if (sd != 0)
+				{
+					closesocket(sd);
+					client[i] = 0;
+				}
+			}
 
 			Log("TcpWin::Run - exit\n");
 		}
@@ -236,7 +245,10 @@ namespace Hap
 		virtual void Stop() override
 		{
 			running = false;
-			cv.notify_one();
+
+			// closesocket causes select to return then accept fails - works on windows, not on linux
+			closesocket(server);
+
 			if (task.joinable())
 				task.join();
 		}

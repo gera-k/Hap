@@ -97,6 +97,34 @@ namespace Hap
 				return Incomplete;
 			}
 
+			auto method()
+			{
+				return std::make_pair(_method, _method_len);
+			}
+
+			auto path()
+			{
+				return std::make_pair(_path, _path_len);
+			}
+
+			size_t hdr_count()
+			{
+				return _num_headers;
+			}
+
+			auto hdr_name(size_t i)
+			{
+				if (i < _num_headers)
+					return std::make_pair(_headers[i].name, _headers[i].name_len);
+				return std::make_pair((const char *)0, (size_t)0);
+			}
+
+			auto hdr_value(size_t i)
+			{
+				if (i < _num_headers)
+					return std::make_pair(_headers[i].value, _headers[i].value_len);
+				return std::make_pair((const char *)0, (size_t)0);
+			}
 
 		};
 
