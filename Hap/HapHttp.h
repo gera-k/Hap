@@ -78,13 +78,13 @@ namespace Hap
 
 			// parse buffer, maybe called multiple times as more data is read into the buffer
 			//	the buflen must indicate current length of valid data in the buffer
-			Status parse(const uint8_t* buf, size_t buflen)
+			Status parse(const char* buf, size_t buflen)
 			{
 				_prevbuflen = _buflen;
 				_buflen = buflen;
 				_num_headers = sizeofarr(_headers);
 
-				int rc = phr_parse_request(reinterpret_cast<const char*>(buf), _buflen, 
+				int rc = phr_parse_request(buf, _buflen, 
 					&_method, &_method_len, &_path, &_path_len,
 					&_minor_version, _headers, &_num_headers, _prevbuflen);
 
@@ -128,23 +128,120 @@ namespace Hap
 
 		};
 
+		enum Header
+		{
+			ContentTypeJson,
+			ContentLength,
+		};
+		static const char* HeaderStr(Header h)
+		{
+			static const char* const str[] =
+			{
+				"Content-Type: application/hap+json",
+				"Content-Length: "
+			};
+			return str[int(h)];
+		}
+
+		// HTTP response creator
+		class Response
+		{
+		private:
+			char* _buf;
+			uint16_t _max = 0;
+			uint16_t _len = 0;
+
+		public:
+			Response(char* buf, uint16_t size)
+				: _buf(buf), _max(size)
+			{}
+
+			char* buf()
+			{
+				if (_max == 0)
+					return nullptr;
+				return _buf;
+			}
+
+			uint16_t len()
+			{
+				return _len;
+			}
+
+			bool start(Status status)
+			{
+				_len = snprintf(_buf, _max, "HTTP/1.1 %s\r\n", StatusStr(status));
+				_max -= _len;
+				return _max != 0;
+			}
+
+			bool add(Header h, int prm = 0)
+			{
+				if (_max == 0)
+					return false;
+
+				int l = 0;
+				switch (h)
+				{
+				case ContentTypeJson:
+					l = snprintf(_buf + _len, _max, "%s\r\n", HeaderStr(h));
+					break;
+				case ContentLength:
+					l = snprintf(_buf + _len, _max, "%s%d\r\n", HeaderStr(h), prm);
+					break;
+				}
+				_len += l;
+				_max -= _len;
+				return _max != 0;
+			}
+
+			// end HTTP response with no data
+			bool end()
+			{
+				if (_max == 0)
+					return false;
+
+				int l = snprintf(_buf + _len, _max, "\r\n");
+				_len += l;
+				_max -= l;
+				return _max != 0;
+			}
+
+			// end HTTP response, attach data from string
+			bool end(const char* s, int l = 0)
+			{
+				if (_max == 0)
+					return false;
+
+				if (l == 0)
+					l = strlen(s);
+				if (!add(ContentLength, l))
+					return false;
+				l = snprintf(_buf + _len, _max, "\r\n%s", s);
+				_len += l;
+				_max -= l;
+				return _max != 0;
+			}
+		};
+
 		// Http Server object
 		//	- all access to Http object must be externally serialized
 		class Server
 		{
 		private:
 			Db& _db;						// accessory database
+			Pairings& _pairings;			// pairings database
 			Parser<MaxHttpHeaders> _reqp;	// HTTP request parser
 			struct Session					// sessions
 			{
 				bool opened;				// true when session is opened
-				uint8_t req[MaxHttpFrame];	// request buffer
-				uint8_t rsp[MaxHttpFrame];	// response buffer
+				char req[MaxHttpFrame];		// request buffer
+				char rsp[MaxHttpFrame];		// response buffer
 			} _sess[MaxHttpSessions + 1];	// last slot is for handling 'too many sessions' condition
 
 		public:
-			Server(Db& db)
-				: _db(db)
+			Server(Db& db, Pairings& pairings)
+				: _db(db), _pairings(pairings)
 			{}
 
 			// Open - returns new session ID, 0..sid_max, or sid_invalid
@@ -166,15 +263,15 @@ namespace Hap
 			//			when recv error or data timeout is detected the caller returns false 
 			//			and disconnects the TCP session 
 			//		- processes the request and creates response
-			//		- calls 'send' to send the response back, close flag is set when the TCP session 
-			//			must be disconnected after sending the response
+			//		- calls 'send' to send the response back
+			//			buf is send to nullptr if response buffer is too small
 			//		-	returns true after calling 'send', no matter if there was HTTP error or not
 			//		-	returns false the caller close the TCP session
 			bool Process(
 				sid_t sid,		// session ID returned from Open
 				void* ctx,		// caller context, passed back in recv and send callbacks
-				std::function<bool(sid_t sid, void* ctx, uint8_t* buf, uint16_t& size)> recv,
-				std::function<bool(sid_t sid, void* ctx, uint8_t* buf, uint16_t len)> send
+				std::function<int(sid_t sid, void* ctx, char* buf, uint16_t size)> recv,
+				std::function<int(sid_t sid, void* ctx, char* buf, uint16_t len)> send
 			);
 		};
 	}

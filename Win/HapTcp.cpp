@@ -97,30 +97,21 @@ namespace Hap
 						else
 						{
 							bool rc = _http->Process(sid, nullptr,
-								[sd](Hap::sid_t sid, void* ctx, uint8_t* buf, uint16_t& size) -> bool
+								[sd](Hap::sid_t sid, void* ctx, char* buf, uint16_t size) -> int
 								{
-
-									int len = recv(sd, (char*)buf, size, 0);
-									if (len <= 0)	// no more data or disconnect
-									{
-										return false;
-									}
-									else
-									{
-										size = uint16_t(len);
-										return true;
-									}
+									return recv(sd, buf, size, 0);
 								},
-								[sd](Hap::sid_t sid, void* ctx, uint8_t* buf, uint16_t len) -> bool
+								[sd](Hap::sid_t sid, void* ctx, char* buf, uint16_t len) -> int
 								{
-									send(sd, (char*)buf, len, 0);
-									return true;
+									if (buf != nullptr)
+										return send(sd, buf, len, 0);
+									return 0;
 								}
 							);
 
 							if (!rc)
 							{
-								Log("HTTP Process error\n");
+								Log("HTTP Disconnect\n");
 								close = true;
 							}
 						}

@@ -14,6 +14,7 @@
 namespace Hap
 {
 	// global constants
+	constexpr uint8_t MaxPairings = 16;						// max number of pairings the accessory supports (4.11 Add pairing)
 	constexpr uint8_t MaxHttpSessions = 8;					// max HTTP sessions (5.2.3 TCP requirements)
 	constexpr uint8_t MaxHttpHeaders = 20;					// max number of HTTP headers in request
 	constexpr uint16_t MaxHttpFrame = 2 + 1024 + 16;		// max HTTP frame - fits max single encrypted frame (5.5.2 Session securiry)
@@ -40,6 +41,75 @@ namespace Hap
 	using sid_t = uint8_t;
 	constexpr sid_t sid_invalid = 0xFF;
 	constexpr sid_t sid_max = MaxHttpSessions - 1;
+
+	// pairings DB, persistent across reboots
+	class Pairings
+	{
+	public:
+		using Id = uint8_t[128];
+		using Key = uint8_t[128];
+	
+		enum Perm
+		{
+			None = 0xFF,	// pairing record is not in use
+			Regular = 0,
+			Admin = 1,
+		};
+
+		struct Record
+		{
+			Perm perm = None;
+			Id id;
+			Key key;
+		};
+
+		// count pairing records with matching Permissions
+		//	in perm == None, cput all records
+		uint8_t Count(Perm perm = None)
+		{
+			uint8_t cnt = 0;
+			for (int i = 0; i < sizeofarr(_db); i++)
+			{
+				Record* rec = &_db[i];
+				
+				if (rec->perm == None)
+					continue;
+
+				if (perm == None || perm == rec->perm)
+					cnt++;
+			}
+
+			return cnt;
+		}
+
+		bool Add(const Id& id, const Key& key, Perm perm)
+		{
+			for (int i = 0; i < sizeofarr(_db); i++)
+			{
+				Record* rec = &_db[i];
+				if (rec->perm == None)
+				{
+					// add new record
+					memcpy(rec->id, &id, sizeof(Id));
+					memcpy(rec->key, &key, sizeof(Key));
+					rec->perm = perm;
+
+					return true;
+				}
+				else if (memcmp(rec->id, &id, sizeof(Id)) == 0)
+				{
+					// Id matches, TODO
+
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+	private:
+		Record _db[MaxPairings];
+	};
 
 	// forward declarations
 	class Db;

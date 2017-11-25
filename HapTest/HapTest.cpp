@@ -59,7 +59,7 @@ public:
 	}
 } db;
 
-Hap::Config gblCfg =
+Hap::Config config =
 {
 	"esp32test",				// const char* name;	// Accessory name - used as initial Bonjour name and as
 								//	Accessory Information Service name of aid=1
@@ -74,14 +74,16 @@ Hap::Config gblCfg =
 	0							// bool BCT;			// Bonjour Compatibility Test
 };
 
-Hap::Http::Server http(db);
+Hap::Pairings pairings;
+
+Hap::Http::Server http(db, pairings);
 
 int main()
 {
-	gblCfg.port = swap_16(7889);
+	config.port = swap_16(7889);
 
-	Hap::Mdns* mdns = Hap::Mdns::Create(&gblCfg);
-	Hap::Tcp* tcp = Hap::Tcp::Create(&gblCfg, &http);
+	Hap::Mdns* mdns = Hap::Mdns::Create(&config);
+	Hap::Tcp* tcp = Hap::Tcp::Create(&config, &http);
 
 	db.init(1);
 
