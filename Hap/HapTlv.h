@@ -7,6 +7,27 @@ namespace Hap
 {
 	namespace Tlv
 	{
+		enum class Method : uint8_t
+		{
+			Reserved = 0,
+			PairSetup = 1,
+			PairVerivy = 2,
+			AddPairing = 3,
+			RemovePairing = 4,
+			ListPairing = 5,
+		};
+
+		enum class State : uint8_t
+		{
+			Unknown = 0,
+			M1 = 1,
+			M2 = 2,
+			M3 = 3,
+			M4 = 4,
+			M5 = 5,
+			M6 = 6,
+		};
+
 		enum class Error : uint8_t
 		{
 			Unknown = 0x01,
@@ -42,39 +63,52 @@ namespace Hap
 		class Parse
 		{
 		private:
-			uint8_t* _buf;			// data buffer containing TLVs
+			const uint8_t* _buf;	// data buffer containing TLVs
 			uint16_t _len;			// length of the buffer
 			uint16_t _off[MaxTlv];	// offsets
 			uint8_t _cnt;			// number of TLVs found
 
 		public:
-			// construct Parser and parse passed in buffer
-			Parse(uint8_t buf, uint16_t len)
-				: _buf(buf), _len(len)
+			// parse passed in buffer
+			uint8_t parse(const char* buf, uint16_t len)
 			{
-				uint8_t* b = buf;
-				uint16_t l = len;
+				_buf = (const uint8_t*)buf;
+				_len = len;
+					
+				const uint8_t* b = _buf;
+				uint16_t l = _len;
 				uint8_t i;
 
+				_cnt = 0;
 				for (i = 0; i < sizeofarr(_off); i++)
 				{
 					if (l < 2)
 						break;
 
-					_off[i] = b;
-					_cnt = i + 1;
+					_off[_cnt++] = b - _buf;
 
-					Type t = Type(*b++);
-					uint8_t s = *b++;
+					Type t = Type(b[0]);
+					uint16_t s = b[1];
 
+					Log("Tlv: type %d  length %d\n", int(t), s);
+
+					s += 2;
 					if (s > l)	// this Tlv spans beyond the buffer, limit its size
 						s = l;
-
 					b += s;
 					l -= s;
 				}
+
+				return _cnt;
 			}
 
+			// return number of items found in this TLV
+			uint8_t count()
+			{
+				return _cnt;
+			}
+
+			// return type of item i
 			Type type(uint8_t i)
 			{
 				if (i >= _cnt)
@@ -83,6 +117,7 @@ namespace Hap
 				return Type(_buf[_off[i]]);
 			}
 
+			// return length of item i
 			uint8_t length(uint8_t i)
 			{
 				if (i >= _cnt)
@@ -91,7 +126,8 @@ namespace Hap
 				return _buf[_off[i] + 1];
 			}
 
-			uint8_t* value(uint8_t i)
+			// return pointer to value of item i
+			const uint8_t* value(uint8_t i)
 			{
 				if (i >= _cnt)
 					return 0;
@@ -99,17 +135,33 @@ namespace Hap
 				return _buf + _off[i] + 2;
 			}
 
-			// extract low-endian integer value
+			// extract low-endian integer from item i
 			int getInt(uint8_t i)
 			{
 				int r = 0;
 				uint8_t l = length(i);
-				uint8_t* v = value(i);
+				const uint8_t* v = value(i);
 
 				for (int i = 0; i < l; i++)
 					r |= (*v++) << (8 * i);
 
 				return r;
+			}
+
+			// extract int/enum value from item with type t
+			//	return false if item does not exist
+			template<typename T>
+			bool get(Type t, T& v)
+			{
+				for (uint8_t i = 0; i < _cnt; i++)
+				{
+					if (type(i) == t)
+					{
+						v = T(getInt(i));
+						return true;
+					}
+				}
+				return false;
 			}
 
 			// extract data bytes from single TLV
@@ -153,14 +205,22 @@ namespace Hap
 		class Create
 		{
 		private:
-			uint8_t* _buf;			// data buffer containing TLVs
-			uint16_t _size;			// size the buffer
-			uint16_t _len = 0;		// length of valid TLPs
+			uint8_t* _buf;		// data buffer for TLV
+			uint16_t _size;		// size the buffer
+			uint16_t _len;		// length of valid TLV
 
 		public:
-			Create(uint8_t* buf, uint16_t size)
-				: _buf(buf), _size(size)
-			{}
+			void create(char* buf, uint16_t size)
+			{
+				_buf = (uint8_t *)buf; 
+				_size = size;
+				_len = 0;
+			}
+
+			uint16_t length()
+			{
+				return _len;
+			}
 
 			// add Integer, use as many bytes as necessary
 			bool addInt(Type t, int v)
@@ -190,6 +250,12 @@ namespace Hap
 				return true;
 			}
 
+			template<typename T>
+			bool add(Type t, T v)
+			{
+				return addInt(t, int(v));
+			}
+
 			// Add bytes, up to 255
 			bool addBytes(Type t, uint8_t* d, uint8_t l)
 			{
@@ -207,7 +273,7 @@ namespace Hap
 				return true;
 			}
 
-			// Add data, span multiple TLVs as necessary
+			// Add data, span multiple items as necessary
 			bool addData(Type t, uint8_t* data, uint16_t len)
 			{
 				uint8_t* d = data;

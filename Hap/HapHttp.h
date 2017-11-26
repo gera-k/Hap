@@ -40,16 +40,39 @@ namespace Hap
 			return str[int(c)];
 		}
 
+		enum Header
+		{
+			ContentType,
+			ContentLength,
+
+			HeaderMax
+		};
+		static const char* HeaderStr(Header h)
+		{
+			static const char* const str[] =
+			{
+				"Content-Type",
+				"Content-Length"
+			};
+			return str[int(h)];
+		}
+		static const char* ContentTypeJson = "application/hap+json";
+		static const char* ContentTypeTlv8 = "application/pairing+tlv8";
+
 		// Http request parser
 		template<int MaxHeaders>
 		class Parser
 		{
 		private:
+			char *_buf;
+			uint16_t _size;
 			struct phr_header _headers[MaxHeaders];
 			const char *_method;
 			const char *_path;
+			const char *_data;
 			size_t _method_len;
 			size_t _path_len;
+			size_t _data_len;
 			size_t _num_headers;
 			size_t _buflen;
 			size_t _prevbuflen;
@@ -63,7 +86,8 @@ namespace Hap
 				Incomplete = 1,
 			};
 
-			Parser()
+			Parser(char *buf, uint16_t size)
+				: _buf(buf), _size(size)
 			{
 			}
 
@@ -76,20 +100,34 @@ namespace Hap
 				_prevbuflen = 0;
 			}
 
+			char* buf()
+			{
+				return _buf;
+			}
+
+			uint16_t size()
+			{
+				return _size;
+			}
+
 			// parse buffer, maybe called multiple times as more data is read into the buffer
 			//	the buflen must indicate current length of valid data in the buffer
-			Status parse(const char* buf, size_t buflen)
+			Status parse(size_t buflen)
 			{
 				_prevbuflen = _buflen;
 				_buflen = buflen;
 				_num_headers = sizeofarr(_headers);
 
-				int rc = phr_parse_request(buf, _buflen, 
+				int rc = phr_parse_request(_buf, _buflen, 
 					&_method, &_method_len, &_path, &_path_len,
 					&_minor_version, _headers, &_num_headers, _prevbuflen);
 
 				if (rc > 0)
+				{
+					_data = _buf + rc;
+					_data_len = _buflen - rc;
 					return Success;
+				}
 				
 				if (rc == -1)
 					return Error;
@@ -105,6 +143,11 @@ namespace Hap
 			auto path()
 			{
 				return std::make_pair(_path, _path_len);
+			}
+
+			auto data()
+			{
+				return std::make_pair(_data, _data_len);
 			}
 
 			size_t hdr_count()
@@ -126,22 +169,53 @@ namespace Hap
 				return std::make_pair((const char *)0, (size_t)0);
 			}
 
-		};
-
-		enum Header
-		{
-			ContentTypeJson,
-			ContentLength,
-		};
-		static const char* HeaderStr(Header h)
-		{
-			static const char* const str[] =
+			// return true if header h exists, and value of integer parameter
+			bool hdr(Header h, int& prm)
 			{
-				"Content-Type: application/hap+json",
-				"Content-Length: "
-			};
-			return str[int(h)];
-		}
+				for (size_t i = 0; i < _num_headers; i++)
+				{
+					const char* s = HeaderStr(h);
+
+					if (strlen(s) == _headers[i].name_len && 
+						memcmp(_headers[i].name, s, _headers[i].name_len) == 0)
+					{
+						char v[16];
+						if (_headers[i].value_len < sizeof(v))
+						{
+							memcpy(v, _headers[i].value, _headers[i].value_len);
+							v[_headers[i].value_len] = 0;
+
+							prm = atoi(v);
+							return true;
+						}
+						else
+						{
+							Log("Http: %s is too big\n", s);
+						}
+					}
+				}
+				return false;
+			}
+
+			// returns true if header h exists and its value matches prm
+			bool hdr(Header h, const char* prm)
+			{
+				for (size_t i = 0; i < _num_headers; i++)
+				{
+					const char* s = HeaderStr(h);
+
+					if (strlen(s) == _headers[i].name_len &&
+						memcmp(_headers[i].name, s, _headers[i].name_len) == 0)
+					{
+						int l = strlen(prm);
+						return l == _headers[i].value_len &&
+							memcmp(prm, _headers[i].value, l) == 0;
+					}
+				}
+				return false;
+			}
+
+		};
 
 		// HTTP response creator
 		class Response
@@ -150,12 +224,14 @@ namespace Hap
 			char* _buf;
 			uint16_t _max = 0;
 			uint16_t _len = 0;
+			uint16_t _len_pos = 0;
 
 		public:
 			Response(char* buf, uint16_t size)
 				: _buf(buf), _max(size)
 			{}
 
+			// return response buffer
 			char* buf()
 			{
 				if (_max == 0)
@@ -163,9 +239,22 @@ namespace Hap
 				return _buf;
 			}
 
+			// return length of valid data in the buffer
 			uint16_t len()
 			{
 				return _len;
+			}
+
+			// return pointer to data area after headers
+			char* data()
+			{
+				return _buf + _len;
+			}
+
+			// return size of data area
+			uint16_t size()
+			{
+				return _max - _len;
 			}
 
 			bool start(Status status)
@@ -175,21 +264,48 @@ namespace Hap
 				return _max != 0;
 			}
 
-			bool add(Header h, int prm = 0)
+			// add header with integer parameter
+			bool add(Header h, int prm)
 			{
 				if (_max == 0)
 					return false;
 
 				int l = 0;
-				switch (h)
+				char* r = _buf + _len;
+
+				l = snprintf(_buf + _len, _max, "%s: %4d\r\n", HeaderStr(h), prm);
+				_len += l;
+				_max -= _len;
+
+				if (h == ContentLength)
 				{
-				case ContentTypeJson:
-					l = snprintf(_buf + _len, _max, "%s\r\n", HeaderStr(h));
-					break;
-				case ContentLength:
-					l = snprintf(_buf + _len, _max, "%s%d\r\n", HeaderStr(h), prm);
-					break;
+					_len_pos = _len - 2;
 				}
+
+				return _max != 0;
+			}
+
+			// add length of data area
+			//	assumes that _len_pos was saved by prevous call to add(ConteneLength,0)
+			void setContentLength(uint16_t len)
+			{
+				if (_len_pos == 0)
+					return;
+
+				char t = _buf[_len_pos];
+				snprintf(_buf + _len_pos - 4, 5, "%4d", len);
+				_buf[_len_pos] = t;
+
+				_len += len;
+			}
+
+			bool add(Header h, const char* prm)
+			{
+				if (_max == 0)
+					return false;
+
+				int l = 0;
+				l = snprintf(_buf + _len, _max, "%s: %s\r\n", HeaderStr(h), prm);
 				_len += l;
 				_max -= _len;
 				return _max != 0;
@@ -231,12 +347,41 @@ namespace Hap
 		private:
 			Db& _db;						// accessory database
 			Pairings& _pairings;			// pairings database
-			Parser<MaxHttpHeaders> _reqp;	// HTTP request parser
-			struct Session					// sessions
+			class Session					// sessions
 			{
-				bool opened;				// true when session is opened
-				char req[MaxHttpFrame];		// request buffer
-				char rsp[MaxHttpFrame];		// response buffer
+			public:
+				// the following fields are valid during one HTTP request/response exchange
+				Parser<MaxHttpHeaders> req;			// HTTP request
+				Response rsp;						// HTTP response
+				Hap::Tlv::Parse<MaxHttpTlv> tlvi;	// incoming TLV parser
+				Hap::Tlv::Create tlvo;				// outgoing TLV creator
+
+				// session constructor, executed once during server object initialization
+				Session()
+					: req(req_b, sizeof(req_b)), rsp(rsp_b, sizeof(rsp_b))
+				{}
+
+				void Open()
+				{
+					opened = true;
+				}
+
+				void Close()
+				{
+					opened = false;
+				}
+
+				bool isOpen()
+				{
+					return opened;
+				}
+
+			private:
+				// the following fields are valid from session open to close
+				bool opened = false;		// true when session is opened
+
+				char req_b[MaxHttpFrame];	// request buffer
+				char rsp_b[MaxHttpFrame];	// response buffer
 			} _sess[MaxHttpSessions + 1];	// last slot is for handling 'too many sessions' condition
 
 		public:
@@ -273,6 +418,9 @@ namespace Hap
 				std::function<int(sid_t sid, void* ctx, char* buf, uint16_t size)> recv,
 				std::function<int(sid_t sid, void* ctx, char* buf, uint16_t len)> send
 			);
+
+		private:
+			void PairSetup_M1(Session* sess);
 		};
 	}
 }

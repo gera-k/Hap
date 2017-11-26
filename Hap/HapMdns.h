@@ -10,7 +10,7 @@ namespace Hap
 	protected:
 		Hap::Config* _cfg;
 		char _name[64];			// service name - initially set to _cfg.name
-		char _txt[64];			// txt buffer
+		char _txt[128];			// txt buffer
 		uint8_t _txt_len = 0;
 
 		void update()
