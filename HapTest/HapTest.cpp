@@ -82,6 +82,8 @@ int main()
 {
 	config.port = swap_16(7889);
 
+	return 0;
+
 	Hap::Mdns* mdns = Hap::Mdns::Create(&config);
 	Hap::Tcp* tcp = Hap::Tcp::Create(&config, &http);
 

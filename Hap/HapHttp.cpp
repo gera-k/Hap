@@ -1,9 +1,12 @@
 #include "Hap.h"
 
+#include "srp\srp.h"
+
 namespace Hap
 {
 	namespace Http
 	{
+		SRP* srp = nullptr;
 
 		// Open
 		//	returns new session ID, 0..sid_max, or sid_invalid
@@ -223,6 +226,8 @@ namespace Hap
 		void Server::PairSetup_M1(Session* sess)
 		{
 			Log("PairSetup M1\n");
+
+			srp = SRP_new(SRP6a_server_method());
 
 			// first create headers without data
 			sess->rsp.start(HTTP_200);

@@ -7,6 +7,9 @@
     <Filter Include="Win">
       <UniqueIdentifier>{b3f190d9-226d-4175-9708-87951c346c22}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Hap\srp">
+      <UniqueIdentifier>{aac9186e-58a8-4be2-a7e0-ff23a7512f2c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Hap\Hap.h">
@@ -42,6 +45,42 @@
     <ClInclude Include="..\Hap\HapTcp.h">
       <Filter>Hap</Filter>
     </ClInclude>
+    <ClInclude Include="..\Hap\HapSrp.h">
+      <Filter>Hap</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\config.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\cstr.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\srp.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\srp_aux.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\t_defines.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\t_sha.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\sph_sha2.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\sph_types.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\tommath.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\_config.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\tommath_private.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="HapTest.cpp" />
@@ -62,6 +101,168 @@
     </ClCompile>
     <ClCompile Include="..\Win\HapTcp.cpp">
       <Filter>Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\HapSrp.cpp">
+      <Filter>Hap</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\cstr.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\srp.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\srp6_server.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\t_math.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\md_helper.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\sha2big.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_add.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_add_d.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_clamp.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_clear.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_cmp.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_cmp_d.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_cmp_mag.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_cnt_lsb.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_copy.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_count_bits.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_div.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_div_2d.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_div_d.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_exch.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_exptmod.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_grow.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_init.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_init_copy.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_init_size.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_lshd.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_mod.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_mod_2d.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_mod_d.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_mul.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_mul_2d.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_mul_d.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_mulmod.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_prime_is_divisible.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_prime_is_prime.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_prime_miller_rabin.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_radix_smap.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_read_unsigned_bin.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_rshd.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_set.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_set_int.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_sqr.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_sqrmod.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_sub.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_sub_d.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_to_unsigned_bin.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_toradix.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_unsigned_bin_size.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_mp_zero.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_prime_tab.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_reverse.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_s_mp_add.c">
+      <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\srp\bn_s_mp_sub.c">
+      <Filter>Hap\srp</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

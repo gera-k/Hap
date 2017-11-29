@@ -116,6 +116,7 @@ namespace Hap
 	class Db;
 }
 
+#include "HapSrp.h"
 #include "HapMdns.h"
 #include "HapJson.h"
 #include "HapTlv.h"

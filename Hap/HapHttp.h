@@ -271,7 +271,6 @@ namespace Hap
 					return false;
 
 				int l = 0;
-				char* r = _buf + _len;
 
 				l = snprintf(_buf + _len, _max, "%s: %4d\r\n", HeaderStr(h), prm);
 				_len += l;
