@@ -63,7 +63,7 @@ Hap::Config config =
 {
 	"esp32test",				// const char* name;	// Accessory name - used as initial Bonjour name and as
 								//	Accessory Information Service name of aid=1
-	"Test Model",				// const char* model;	// Model name (Bonjour and AIS)
+	"TestModel",				// const char* model;	// Model name (Bonjour and AIS)
 	"00:11:22:33:44:55",		// const char* id;		// Device ID (XX:XX:XX:XX:XX:XX, generated new on factory reset)
 	1,							// uint32_t cn;		// Current configuration number, incremented on db change
 	5,							// uint8_t ci;			// category identifier
@@ -81,8 +81,6 @@ Hap::Http::Server http(db, pairings);
 int main()
 {
 	config.port = swap_16(7889);
-
-	return 0;
 
 	Hap::Mdns* mdns = Hap::Mdns::Create(&config);
 	Hap::Tcp* tcp = Hap::Tcp::Create(&config, &http);
@@ -160,9 +158,24 @@ int main()
 	return 0;
 }
 
+#include <time.h>
+#include <stdlib.h>
 
+extern "C" {
+	void t_stronginitrand()
+	{
+		srand((unsigned)time(NULL));
+	}
 
+	void t_random(char* data, unsigned size)
+	{
 
+		for (unsigned i = 0; i < size; i++)
+		{
+			*data++ = rand() & 0xFF;
+		}
+	}
+}
 
 #if 0
 

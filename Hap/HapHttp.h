@@ -360,14 +360,16 @@ namespace Hap
 					: req(req_b, sizeof(req_b)), rsp(rsp_b, sizeof(rsp_b))
 				{}
 
-				void Open()
+				void Open(sid_t sid)
 				{
+					_sid = sid;
 					opened = true;
 				}
 
 				void Close()
 				{
 					opened = false;
+					_sid = sid_invalid;
 				}
 
 				bool isOpen()
@@ -375,9 +377,17 @@ namespace Hap
 					return opened;
 				}
 
+				sid_t Sid()
+				{
+					if (opened)
+						return _sid;
+					return sid_invalid;
+				}
+
 			private:
 				// the following fields are valid from session open to close
 				bool opened = false;		// true when session is opened
+				sid_t _sid = sid_invalid;	// valid when opened
 
 				char req_b[MaxHttpFrame];	// request buffer
 				char rsp_b[MaxHttpFrame];	// response buffer
@@ -420,6 +430,7 @@ namespace Hap
 
 		private:
 			void PairSetup_M1(Session* sess);
+			void PairSetup_M3(Session* sess);
 		};
 	}
 }

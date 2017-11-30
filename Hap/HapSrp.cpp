@@ -1,10 +1,11 @@
 
 
-#include "srp/sha2big.c"
-#include "srp/cstr.c"
-#include "srp/t_math.c" 
-#include "srp/srp.c"
-#include "srp/srp6_server.c"
+#include "sha2big.c"
+
+#include "cstr.c"
+#include "t_math.c" 
+#include "srp.c"
+#include "srp6_server.c"
 
 #include "tommath_class.h"
 #include "bncore.c"
@@ -94,12 +95,4 @@
 #include "bn_fast_s_mp_mul_high_digs.c"
 
 
-void t_stronginitrand()
-{
-}
-
-void t_random(char* data, unsigned size)
-{
-	memset(data, 0, size);
-}
 

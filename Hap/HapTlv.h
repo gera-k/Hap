@@ -189,7 +189,7 @@ namespace Hap
 						return true;
 					}
 
-					if (length(i) < max)
+					if (length(i) > max)
 						return false;
 
 					getBytes(i, d);
@@ -200,6 +200,19 @@ namespace Hap
 					i++;
 				}
 			}
+
+			bool get(Type t, uint8_t* data, uint16_t& size)
+			{
+				for (uint8_t i = 0; i < _cnt; i++)
+				{
+					if (type(i) == t)
+					{
+						return getData(i, data, size);
+					}
+				}
+				return false;
+			}
+
 		};
 
 		class Create
@@ -274,7 +287,7 @@ namespace Hap
 			}
 
 			// Add data, span multiple items as necessary
-			bool addData(Type t, uint8_t* data, uint16_t len)
+			bool add(Type t, uint8_t* data, uint16_t len)
 			{
 				uint8_t* d = data;
 
