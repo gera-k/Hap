@@ -32,8 +32,8 @@
 
 #include "config.h"
 
-//#include "tommath.h"
-#include "mpi.h"
+#include "tommath.h"
+//#include "mpi.h"
 typedef mp_int * BigInteger;
 typedef void * BigIntegerCtx;
 typedef void * BigIntegerModAccel;
@@ -1006,7 +1006,8 @@ BigIntegerCmp(BigInteger c1, BigInteger c2)
 int
 BigIntegerCmpInt(BigInteger c1, unsigned int c2)
 {
-	return mp_cmp_int(c1, c2);
+//	return mp_cmp_int(c1, c2);
+	return mp_cmp_d(c1, c2);
 }
 
 BigIntegerResult
