@@ -9,7 +9,7 @@ namespace Hap
 	{
 		enum class Method : uint8_t
 		{
-			Reserved = 0,
+			PairSetupNonMfi = 0,
 			PairSetup = 1,
 			PairVerivy = 2,
 			AddPairing = 3,

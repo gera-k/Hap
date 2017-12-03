@@ -354,7 +354,7 @@ srp6_server_key(SRP * srp, cstr ** result,
   if(result) {
     if(*result == NULL)
       *result = cstr_new();
-    cstr_setn(*result, (const char*)SERVER_CTXP(srp)->k, RFC2945_KEY_LEN);
+    cstr_setn(*result, SERVER_CTXP(srp)->k, RFC2945_KEY_LEN);
   }
 
   return SRP_SUCCESS;

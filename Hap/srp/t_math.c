@@ -32,56 +32,12 @@
 
 #include "config.h"
 
-#ifdef OPENSSL
-# include "openssl/opensslv.h"
-# include "openssl/bn.h"
-typedef BIGNUM * BigInteger;
-typedef BN_CTX * BigIntegerCtx;
-typedef BN_MONT_CTX * BigIntegerModAccel;
-# ifdef OPENSSL_ENGINE
-#  include "openssl/engine.h"
-static ENGINE * default_engine = NULL;
-# endif /* OPENSSL_ENGINE */
-typedef int (*modexp_meth)(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
-			   const BIGNUM *m, BN_CTX *ctx, BN_MONT_CTX *mctx);
-static modexp_meth default_modexp = NULL;
-#elif defined(CRYPTOLIB)
-# include "libcrypt.h"
-typedef BigInt BigInteger;
-typedef void * BigIntegerCtx;
-typedef void * BigIntegerModAccel;
-#elif defined(GNU_MP)
-# include "gmp.h"
-typedef MP_INT * BigInteger;
-typedef void * BigIntegerCtx;
-typedef void * BigIntegerModAccel;
-# if __GNU_MP_VERSION >= 4 || (__GNU_MP_VERSION == 4 && __GNU_MP_VERSION_MINOR >= 1)
-/* GMP 4.1 and up has fast import/export routines for integer conversion */
-#  define GMP_IMPEXP 1
-# endif
-#elif defined(TOMMATH)
-# ifdef TOMCRYPT
-   /* as of v0.96 */
-#  include "ltc_tommath.h"
-# else
-#  include "tommath.h"
-# endif
+//#include "tommath.h"
+#include "mpi.h"
 typedef mp_int * BigInteger;
 typedef void * BigIntegerCtx;
 typedef void * BigIntegerModAccel;
-#elif defined(GCRYPT)
-# include "gcrypt.h"
-typedef gcry_mpi_t BigInteger;
-typedef void * BigIntegerCtx;
-typedef void * BigIntegerModAccel;
-#elif defined(MPI)
-# include "mpi.h"
-typedef mp_int * BigInteger;
-typedef void * BigIntegerCtx;
-typedef void * BigIntegerModAccel;
-#else
-# error "no math library specified"
-#endif
+
 #define MATH_PRIV
 
 #include "t_defines.h"
@@ -89,9 +45,11 @@ typedef void * BigIntegerModAccel;
 #include "srp_aux.h"
 
 /* Math library interface stubs */
+#if 0
 
 BigInteger
-BigIntegerFromInt(unsigned int n)
+BigIntegerFromInt(n)
+     unsigned int n;
 {
 #ifdef OPENSSL
   BIGNUM * a = BN_new();
@@ -120,7 +78,9 @@ BigIntegerFromInt(unsigned int n)
 }
 
 BigInteger
-BigIntegerFromBytes(const unsigned char * bytes, int length)
+BigIntegerFromBytes(bytes, length)
+     const unsigned char * bytes;
+     int length;
 {
 #ifdef OPENSSL
   BIGNUM * a = BN_new();
@@ -181,7 +141,10 @@ BigIntegerFromBytes(const unsigned char * bytes, int length)
 }
 
 int
-BigIntegerToBytes(BigInteger src,unsigned char *  dest, int destlen)
+BigIntegerToBytes(src, dest, destlen)
+     BigInteger src;
+     unsigned char * dest;
+     int destlen;
 {
 #ifdef OPENSSL
   return BN_bn2bin(src, dest);
@@ -253,7 +216,10 @@ BigIntegerToCstrEx(BigInteger x, cstr * out, int len)
 }
 
 BigIntegerResult
-BigIntegerToHex(BigInteger src, char * dest, int destlen)
+BigIntegerToHex(src, dest, destlen)
+     BigInteger src;
+     char * dest;
+     int destlen;
 {
 #ifdef OPENSSL
   strcpy(dest, BN_bn2hex(src));
@@ -274,7 +240,11 @@ static char b64table[] =
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz./";
 
 BigIntegerResult
-BigIntegerToString(BigInteger src, char * dest, int destlen, unsigned int radix)
+BigIntegerToString(src, dest, destlen, radix)
+     BigInteger src;
+     char * dest;
+     int destlen;
+     unsigned int radix;
 {
   BigInteger t = BigIntegerFromInt(0);
   char * p = dest;
@@ -298,7 +268,8 @@ BigIntegerToString(BigInteger src, char * dest, int destlen, unsigned int radix)
 }
 
 int
-BigIntegerBitLen(BigInteger b)
+BigIntegerBitLen(b)
+     BigInteger b;
 {
 #ifdef OPENSSL
   return BN_num_bits(b);
@@ -314,7 +285,8 @@ BigIntegerBitLen(BigInteger b)
 }
 
 int
-BigIntegerCmp(BigInteger c1, BigInteger c2)
+BigIntegerCmp(c1, c2)
+     BigInteger c1, c2;
 {
 #ifdef OPENSSL
   return BN_cmp(c1, c2);
@@ -330,7 +302,9 @@ BigIntegerCmp(BigInteger c1, BigInteger c2)
 }
 
 int
-BigIntegerCmpInt(BigInteger c1, unsigned int c2)
+BigIntegerCmpInt(c1, c2)
+     BigInteger c1;
+     unsigned int c2;
 {
 #ifdef OPENSSL
   if(c1->top > 1)
@@ -365,7 +339,9 @@ BigIntegerCmpInt(BigInteger c1, unsigned int c2)
 }
 
 BigIntegerResult
-BigIntegerLShift(BigInteger result, BigInteger x, unsigned int bits)
+BigIntegerLShift(result, x, bits)
+     BigInteger result, x;
+     unsigned int bits;
 {
 #ifdef OPENSSL
   BN_lshift(result, x, bits);
@@ -382,7 +358,8 @@ BigIntegerLShift(BigInteger result, BigInteger x, unsigned int bits)
 }
 
 BigIntegerResult
-BigIntegerAdd(BigInteger result, BigInteger a1, BigInteger a2)
+BigIntegerAdd(result, a1, a2)
+     BigInteger result, a1, a2;
 {
 #ifdef OPENSSL
   BN_add(result, a1, a2);
@@ -399,7 +376,9 @@ BigIntegerAdd(BigInteger result, BigInteger a1, BigInteger a2)
 }
 
 BigIntegerResult
-BigIntegerAddInt(BigInteger result, BigInteger a1, unsigned int a2)
+BigIntegerAddInt(result, a1, a2)
+     BigInteger result, a1;
+     unsigned int a2;
 {
 #ifdef OPENSSL
   if(result != a1)
@@ -422,7 +401,8 @@ BigIntegerAddInt(BigInteger result, BigInteger a1, unsigned int a2)
 }
 
 BigIntegerResult
-BigIntegerSub(BigInteger result, BigInteger s1, BigInteger s2)
+BigIntegerSub(result, s1, s2)
+     BigInteger result, s1, s2;
 {
 #ifdef OPENSSL
   BN_sub(result, s1, s2);
@@ -439,7 +419,9 @@ BigIntegerSub(BigInteger result, BigInteger s1, BigInteger s2)
 }
 
 BigIntegerResult
-BigIntegerSubInt(BigInteger result, BigInteger s1, unsigned int s2)
+BigIntegerSubInt(result, s1, s2)
+     BigInteger result, s1;
+     unsigned int s2;
 {
 #ifdef OPENSSL
   if(result != s1)
@@ -462,7 +444,9 @@ BigIntegerSubInt(BigInteger result, BigInteger s1, unsigned int s2)
 }
 
 BigIntegerResult
-BigIntegerMul(BigInteger result, BigInteger m1, BigInteger m2, BigIntegerCtx c)
+BigIntegerMul(result, m1, m2, c)
+     BigInteger result, m1, m2;
+     BigIntegerCtx c;
 {
 #ifdef OPENSSL
   BN_CTX * ctx = NULL;
@@ -484,7 +468,10 @@ BigIntegerMul(BigInteger result, BigInteger m1, BigInteger m2, BigIntegerCtx c)
 }
 
 BigIntegerResult
-BigIntegerMulInt(BigInteger result, BigInteger m1, unsigned int m2, BigIntegerCtx c)
+BigIntegerMulInt(result, m1, m2, c)
+     BigInteger result, m1;
+     unsigned int m2;
+     BigIntegerCtx c;
 {
 #ifdef OPENSSL
   if(result != m1)
@@ -507,7 +494,10 @@ BigIntegerMulInt(BigInteger result, BigInteger m1, unsigned int m2, BigIntegerCt
 }
 
 BigIntegerResult
-BigIntegerDivInt(BigInteger result, BigInteger d, unsigned int m, BigIntegerCtx c)
+BigIntegerDivInt(result, d, m, c)
+     BigInteger result, d;
+     unsigned int m;
+     BigIntegerCtx c;
 {
 #ifdef OPENSSL
   if(result != d)
@@ -542,7 +532,9 @@ BigIntegerDivInt(BigInteger result, BigInteger d, unsigned int m, BigIntegerCtx 
 }
 
 BigIntegerResult
-BigIntegerMod(BigInteger result, BigInteger d, BigInteger m, BigIntegerCtx c)
+BigIntegerMod(result, d, m, c)
+     BigInteger result, d, m;
+     BigIntegerCtx c;
 {
 #ifdef OPENSSL
   BN_CTX * ctx = NULL;
@@ -564,7 +556,10 @@ BigIntegerMod(BigInteger result, BigInteger d, BigInteger m, BigIntegerCtx c)
 }
 
 unsigned int
-BigIntegerModInt(BigInteger d, unsigned int m, BigIntegerCtx c)
+BigIntegerModInt(d, m, c)
+     BigInteger d;
+     unsigned int m;
+     BigIntegerCtx c;
 {
 #ifdef OPENSSL
   return BN_mod_word(d, m);
@@ -618,7 +613,9 @@ BigIntegerModInt(BigInteger d, unsigned int m, BigIntegerCtx c)
 }
 
 BigIntegerResult
-BigIntegerModMul(BigInteger r, BigInteger m1, BigInteger m2, BigInteger modulus, BigIntegerCtx c)
+BigIntegerModMul(r, m1, m2, modulus, c)
+     BigInteger r, m1, m2, modulus;
+     BigIntegerCtx c;
 {
 #ifdef OPENSSL
   BN_CTX * ctx = NULL;
@@ -642,7 +639,10 @@ BigIntegerModMul(BigInteger r, BigInteger m1, BigInteger m2, BigInteger modulus,
 }
 
 BigIntegerResult
-BigIntegerModExp(BigInteger r, BigInteger b, BigInteger e, BigInteger m, BigIntegerCtx c, BigIntegerModAccel a)
+BigIntegerModExp(r, b, e, m, c, a)
+     BigInteger r, b, e, m;
+     BigIntegerCtx c;
+     BigIntegerModAccel a;
 {
 #ifdef OPENSSL
   BN_CTX * ctx = NULL;
@@ -677,7 +677,9 @@ BigIntegerModExp(BigInteger r, BigInteger b, BigInteger e, BigInteger m, BigInte
 }
 
 int
-BigIntegerCheckPrime(BigInteger n, BigIntegerCtx c)
+BigIntegerCheckPrime(n, c)
+     BigInteger n;
+     BigIntegerCtx c;
 {
 #ifdef OPENSSL
   int rv;
@@ -722,7 +724,8 @@ BigIntegerCheckPrime(BigInteger n, BigIntegerCtx c)
 }
 
 BigIntegerResult
-BigIntegerFree(BigInteger b)
+BigIntegerFree(b)
+     BigInteger b;
 {
 #ifdef OPENSSL
   BN_free(b);
@@ -741,7 +744,8 @@ BigIntegerFree(BigInteger b)
 }
 
 BigIntegerResult
-BigIntegerClearFree(BigInteger b)
+BigIntegerClearFree(b)
+     BigInteger b;
 {
 #ifdef OPENSSL
   BN_clear_free(b);
@@ -774,7 +778,8 @@ BigIntegerCtxNew()
 }
 
 BigIntegerResult
-BigIntegerCtxFree(BigIntegerCtx ctx)
+BigIntegerCtxFree(ctx)
+     BigIntegerCtx ctx;
 {
 #ifdef OPENSSL
   if(ctx)
@@ -784,7 +789,9 @@ BigIntegerCtxFree(BigIntegerCtx ctx)
 }
 
 BigIntegerModAccel
-BigIntegerModAccelNew(BigInteger m, BigIntegerCtx c)
+BigIntegerModAccelNew(m, c)
+     BigInteger m;
+     BigIntegerCtx c;
 {
 #ifdef OPENSSL
   BN_CTX * ctx = NULL;
@@ -804,7 +811,8 @@ BigIntegerModAccelNew(BigInteger m, BigIntegerCtx c)
 }
 
 BigIntegerResult
-BigIntegerModAccelFree(BigIntegerModAccel accel)
+BigIntegerModAccelFree(accel)
+     BigIntegerModAccel accel;
 {
 #ifdef OPENSSL
   if(accel)
@@ -867,3 +875,229 @@ BigIntegerReleaseEngine()
 #endif
   return BIG_INTEGER_SUCCESS;
 }
+
+#endif
+
+
+BigIntegerResult
+BigIntegerFree(BigInteger b)
+{
+	mp_clear(b);
+	free(b);
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerResult
+BigIntegerClearFree(BigInteger b)
+{
+	mp_clear(b);
+	free(b);
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerCtx
+BigIntegerCtxNew()
+{
+	return NULL;
+}
+
+BigIntegerResult
+BigIntegerCtxFree(BigIntegerCtx ctx)
+{
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerModAccel
+BigIntegerModAccelNew(BigInteger m, BigIntegerCtx c)
+{
+	return NULL;
+}
+
+BigIntegerResult
+BigIntegerModAccelFree(BigIntegerModAccel accel)
+{
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerResult
+BigIntegerInitialize()
+{
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerResult
+BigIntegerFinalize()
+{
+	return BigIntegerReleaseEngine();
+}
+
+BigIntegerResult
+BigIntegerReleaseEngine()
+{
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigInteger
+BigIntegerFromInt(unsigned int n)
+{
+	BigInteger rv = (BigInteger)malloc(sizeof(mp_int));
+	if (rv) {
+		mp_init(rv);
+		mp_set_int(rv, n);
+	}
+	return rv;
+}
+
+BigInteger
+BigIntegerFromBytes(const unsigned char * bytes, int length)
+{
+	BigInteger rv = (BigInteger)malloc(sizeof(mp_int));
+	if (rv) {
+		mp_init(rv);
+		mp_read_unsigned_bin(rv, bytes, length);
+	}
+	return rv;
+}
+
+BigIntegerResult
+BigIntegerToCstr(BigInteger x, cstr * out)
+{
+	int n = BigIntegerByteLen(x);
+	if (cstr_set_length(out, n) < 0)
+		return BIG_INTEGER_ERROR;
+	if (cstr_set_length(out, BigIntegerToBytes(x, out->data, n)) < 0)
+		return BIG_INTEGER_ERROR;
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerResult
+BigIntegerToCstrEx(BigInteger x, cstr * out, int len)
+{
+	int n;
+	if (cstr_set_length(out, len) < 0)
+		return BIG_INTEGER_ERROR;
+	n = BigIntegerToBytes(x, (unsigned char *)(out->data), len);
+	if (n < len) {
+		memmove(out->data + (len - n), out->data, n);
+		memset(out->data, 0, len - n);
+	}
+	return BIG_INTEGER_SUCCESS;
+}
+
+int
+BigIntegerToBytes(BigInteger src, unsigned char * dest, int destlen)
+{
+	mp_to_unsigned_bin(src, dest);
+	return mp_unsigned_bin_size(src);
+}
+
+int
+BigIntegerBitLen(BigInteger b)
+{
+	return mp_count_bits(b);
+}
+
+int
+BigIntegerCmp(BigInteger c1, BigInteger c2)
+{
+	return mp_cmp(c1, c2);
+}
+
+int
+BigIntegerCmpInt(BigInteger c1, unsigned int c2)
+{
+	return mp_cmp_int(c1, c2);
+}
+
+BigIntegerResult
+BigIntegerAdd(BigInteger result, BigInteger a1, BigInteger a2)
+{
+	mp_add(a1, a2, result);
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerResult
+BigIntegerAddInt(BigInteger result, BigInteger a1, unsigned int a2)
+{
+	mp_add_d(a1, a2, result);
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerResult
+BigIntegerSub(BigInteger result, BigInteger s1, BigInteger s2)
+{
+	mp_sub(s1, s2, result);
+	return BIG_INTEGER_SUCCESS;
+}
+
+
+BigIntegerResult
+BigIntegerMul(BigInteger result, BigInteger m1, BigInteger m2, BigIntegerCtx c)
+{
+	mp_mul(m1, m2, result);
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerResult
+BigIntegerMod(BigInteger result, BigInteger d, BigInteger m, BigIntegerCtx c)
+{
+	mp_mod(d, m, result);
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerResult
+BigIntegerModMul(BigInteger r, BigInteger m1, BigInteger m2, BigInteger modulus, BigIntegerCtx c)
+{
+	mp_mulmod(m1, m2, modulus, r);
+	return BIG_INTEGER_SUCCESS;
+}
+
+BigIntegerResult
+BigIntegerModExp(BigInteger r, BigInteger b, BigInteger e, BigInteger m, BigIntegerCtx c, BigIntegerModAccel a)
+{
+	mp_exptmod(b, e, m, r);
+	return BIG_INTEGER_SUCCESS;
+}
+
+unsigned int
+BigIntegerModInt(BigInteger d, unsigned int m, BigIntegerCtx c)
+{
+	mp_digit r;
+	mp_mod_d(d, m, &r);
+	return r;
+}
+
+BigIntegerResult
+BigIntegerDivInt(BigInteger result, BigInteger d, unsigned int m, BigIntegerCtx c)
+{
+	mp_div_d(d, m, result, NULL);
+	return BIG_INTEGER_SUCCESS;
+}
+
+static unsigned char b64table[] =
+"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz./";
+
+BigIntegerResult
+BigIntegerToString(BigInteger src, char * dest, int destlen, unsigned int radix)
+{
+	BigInteger t = BigIntegerFromInt(0);
+	char * p = dest;
+	char c;
+
+	*p++ = b64table[BigIntegerModInt(src, radix, NULL)];
+	BigIntegerDivInt(t, src, radix, NULL);
+	while (BigIntegerCmpInt(t, 0) > 0) {
+		*p++ = b64table[BigIntegerModInt(t, radix, NULL)];
+		BigIntegerDivInt(t, t, radix, NULL);
+	}
+	BigIntegerFree(t);
+	*p-- = '\0';
+	/* reverse the string */
+	while (p > dest) {
+		c = *p;
+		*p-- = *dest;
+		*dest++ = c;
+	}
+	return BIG_INTEGER_SUCCESS;
+}
+

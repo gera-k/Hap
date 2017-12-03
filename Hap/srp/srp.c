@@ -216,7 +216,7 @@ SRP_set_username(SRP * srp, const char * username)
 _TYPE( SRP_RESULT )
 SRP_set_user_raw(SRP * srp, const unsigned char * user, int userlen)
 {
-  cstr_setn(srp->username, (const char *)user, userlen);
+  cstr_setn(srp->username, user, userlen);
   if(srp->slu)
     return SRP_SERVER_do_lookup(srp->slu, srp, srp->username);
   else
@@ -240,7 +240,7 @@ SRP_set_params(SRP * srp, const unsigned char * modulus, int modlen,
   srp->generator = BigIntegerFromBytes(generator, genlen);
   if(srp->salt == NULL)
     srp->salt = cstr_new();
-  cstr_setn(srp->salt, (const char *)salt, saltlen);
+  cstr_setn(srp->salt, salt, saltlen);
 
   /* Now attempt to validate parameters */
   if(BigIntegerBitLen(srp->modulus) < SRP_get_modulus_min_bits())
@@ -285,7 +285,7 @@ SRP_gen_pub(SRP * srp, cstr ** result)
 _TYPE( SRP_RESULT )
 SRP_add_ex_data(SRP * srp, const unsigned char * data, int datalen)
 {
-  cstr_appendn(srp->ex_data, (const char *)data, datalen);
+  cstr_appendn(srp->ex_data, data, datalen);
   return SRP_SUCCESS;
 }
 

@@ -1,8 +1,8 @@
-#include <srp/sph_sha2.h>
+#include <sha2.h>
 #include <stdint.h>
 
-typedef sph_sha512_context SHACTX;
-#define SHAInit sph_sha512_init
-#define SHAUpdate sph_sha512
-#define SHAFinal(b,c) sph_sha512_close(c,b)
-#define SHA_DIGESTSIZE (SPH_SIZE_sha512/8)
+typedef sha512_ctx SHACTX;
+#define SHAInit sha512_init
+#define SHAUpdate(c, m, l) sha512_update((c), (const unsigned char *)(m), (l))
+#define SHAFinal(d, c) sha512_final((c), (d))
+#define SHA_DIGESTSIZE SHA512_DIGEST_SIZE

@@ -7,7 +7,7 @@
 #define EXPFACTOR	2		/* Minimum expansion factor */
 #define MINSIZE		4		/* Absolute minimum - one word */
 
-static char cstr_empty_string[] = { '\0' };
+static unsigned char cstr_empty_string[] = { '\0' };
 static cstr_allocator * default_alloc = NULL;
 
 /*
@@ -17,7 +17,7 @@ static cstr_allocator * default_alloc = NULL;
  * problems, define PEDANTIC_ARGS below.
  */
 #ifdef PEDANTIC_ARGS
-static void * Cmalloc(size_t n, void * heap) { return malloc(n); }
+static void * Cmalloc(int n, void * heap) { return malloc(n); }
 static void Cfree(void * p, void * heap) { free(p); }
 static cstr_allocator malloc_allocator = { Cmalloc, Cfree, NULL };
 #else
@@ -76,11 +76,11 @@ cstr_dup(const cstr * str)
 _TYPE( cstr * )
 cstr_create(const char * s)
 {
-  return cstr_createn(s, strlen(s));
+  return cstr_createn((const unsigned char *)s, strlen(s));
 }
 
 _TYPE( cstr * )
-cstr_createn(const char * s, int len)
+cstr_createn(const unsigned char * s, int len)
 {
   cstr * str = cstr_new();
   if(str) {
@@ -129,7 +129,7 @@ cstr_empty(cstr * str)
 static int
 cstr_alloc(cstr * str, int len)
 {
-  char * t;
+  unsigned char * t;
 
   if(len > str->cap) {
     if(len < EXPFACTOR * str->cap)
@@ -137,7 +137,7 @@ cstr_alloc(cstr * str, int len)
     if(len < MINSIZE)
       len = MINSIZE;
 
-    t = (char *) (*str->allocator->alloc)(len * sizeof(char),
+    t = (unsigned char *) (*str->allocator->alloc)(len * sizeof(char),
 					  str->allocator->heap);
     if(t) {
       if(str->data) {
@@ -168,11 +168,11 @@ cstr_copy(cstr * dst, const cstr * src)
 _TYPE( int )
 cstr_set(cstr * str, const char * s)
 {
-  return cstr_setn(str, s, strlen(s));
+  return cstr_setn(str, (const unsigned char *)s, strlen(s));
 }
 
 _TYPE( int )
-cstr_setn(cstr * str, const char * s, int len)
+cstr_setn(cstr * str, const unsigned char * s, int len)
 {
   if(cstr_alloc(str, len + 1) < 0)
     return -1;
@@ -205,11 +205,11 @@ cstr_set_length(cstr * str, int len)
 _TYPE( int )
 cstr_append(cstr * str, const char * s)
 {
-  return cstr_appendn(str, s, strlen(s));
+  return cstr_appendn(str, (const unsigned char *)s, strlen(s));
 }
 
 _TYPE( int )
-cstr_appendn(cstr * str, const char * s, int len)
+cstr_appendn(cstr * str, const unsigned char * s, int len)
 {
   if(cstr_alloc(str, str->length + len + 1) < 0)
     return -1;

@@ -10,6 +10,7 @@
 #include <functional>
 
 #define Log printf
+void trh(const char* Header, const void* Buffer, size_t Length);
 
 namespace Hap
 {

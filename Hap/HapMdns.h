@@ -38,7 +38,7 @@ namespace Hap
 
 			// ff - feature flags
 			//		1 - supports HAP pairing
-			l = snprintf(p + 1, max, "ff=1");
+			l = snprintf(p + 1, max, "ff=0");
 			max -= l;
 			if (max <= 0) goto Ret;
 			*p++ = l;

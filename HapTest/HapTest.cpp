@@ -82,6 +82,11 @@ int main()
 {
 	config.port = swap_16(7889);
 
+	//mp_test();
+	//sha2_test();
+	//srp_test2();
+	//return 0;
+	
 	Hap::Mdns* mdns = Hap::Mdns::Create(&config);
 	Hap::Tcp* tcp = Hap::Tcp::Create(&config, &http);
 
@@ -167,12 +172,12 @@ extern "C" {
 		srand((unsigned)time(NULL));
 	}
 
-	void t_random(char* data, unsigned size)
+	void t_random(unsigned char* data, unsigned size)
 	{
 
 		for (unsigned i = 0; i < size; i++)
 		{
-			*data++ = rand() & 0xFF;
+			*data++ = /*rand()*/ i & 0xFF;
 		}
 	}
 }
@@ -231,3 +236,53 @@ ls.set(2, 3456);
 printf("mvi %d  mvf %g\n", mvi.get(), mvf.get());
 
 #endif
+
+void trh(const char* Header, const void* Buffer, size_t Length)
+{
+	static const char hex[] = "0123456789ABCDEF";
+	const uint8_t* a = (const uint8_t*)Buffer;
+	size_t i;
+	size_t max = 16;
+
+	Log("%s addr %p size 0x%X:\n", Header, Buffer, (unsigned)Length);
+
+	while (Length > 0)
+	{
+		char line[52];
+		char *p = line;
+
+		if (Length < max)
+			max = Length;
+
+		memset(line, 0, sizeof(line));
+
+		for (i = 0; i < 16; i++)
+		{
+			if (i < max)
+			{
+				*p++ = hex[(a[i] & 0xf0) >> 4];
+				*p++ = hex[a[i] & 0x0f];
+			}
+			else
+			{
+				*p++ = ' ';
+				*p++ = ' ';
+			}
+		}
+
+		*p++ = ' ';
+		*p++ = ' ';
+		*p++ = ' ';
+
+		for (i = 0; i < max; i++)
+		{
+			if (a[i] < 0x20 || a[i] > 0x7e) *p++ = '.';
+			else *p++ = a[i];
+		}
+
+		Log("0x%04lX:%s\n", (uintptr_t)a & 0xFFFF, line);
+
+		Length -= max;
+		a += max;
+	}
+}

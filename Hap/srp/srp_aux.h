@@ -131,7 +131,7 @@ _TYPE( BigIntegerResult ) BigIntegerReleaseEngine();
  *   interleaved hash, and is used with SRP6.
  * "t_getpass" reads a password from the terminal without echoing.
  */
-_TYPE( void ) t_random P((char *, unsigned));
+_TYPE( void ) t_random P((unsigned char *, unsigned));
 _TYPE( void ) t_stronginitrand();
 _TYPE( unsigned char * )
   t_sessionkey P((unsigned char *, unsigned char *, unsigned));
