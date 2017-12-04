@@ -114,6 +114,9 @@
     <ClInclude Include="..\Hap\HapCrypt.h">
       <Filter>Hap</Filter>
     </ClInclude>
+    <ClInclude Include="..\Hap\crypt\hkdf.h">
+      <Filter>Hap\crypt</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="HapTest.cpp" />
@@ -195,6 +198,9 @@
     </ClCompile>
     <ClCompile Include="..\Hap\HapCrypt.cpp">
       <Filter>Hap</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\crypt\hkdf.c">
+      <Filter>Hap\crypt</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

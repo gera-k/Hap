@@ -244,7 +244,7 @@ void trh(const char* Header, const void* Buffer, size_t Length)
 	size_t i;
 	size_t max = 16;
 
-	Log("%s addr %p size 0x%X:\n", Header, Buffer, (unsigned)Length);
+	Log("%s addr %p size 0x%X(%d):\n", Header, Buffer, (unsigned)Length, (unsigned)Length);
 
 	while (Length > 0)
 	{

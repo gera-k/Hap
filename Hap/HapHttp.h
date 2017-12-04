@@ -69,7 +69,7 @@ namespace Hap
 			struct phr_header _headers[MaxHeaders];
 			const char *_method;
 			const char *_path;
-			const char *_data;
+			const uint8_t* _data;
 			size_t _method_len;
 			size_t _path_len;
 			size_t _data_len;
@@ -124,7 +124,7 @@ namespace Hap
 
 				if (rc > 0)
 				{
-					_data = _buf + rc;
+					_data = (uint8_t*)_buf + rc;
 					_data_len = _buflen - rc;
 					return Success;
 				}
@@ -431,6 +431,7 @@ namespace Hap
 		private:
 			void PairSetup_M1(Session* sess);
 			void PairSetup_M3(Session* sess);
+			void PairSetup_M5(Session* sess);
 		};
 	}
 }

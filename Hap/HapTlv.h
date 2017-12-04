@@ -69,8 +69,15 @@ namespace Hap
 			uint8_t _cnt;			// number of TLVs found
 
 		public:
+			Parse() {}
+
+			Parse(const uint8_t* buf, uint16_t len)
+			{
+				parse(buf, len);
+			}
+
 			// parse passed in buffer
-			uint8_t parse(const char* buf, uint16_t len)
+			uint8_t parse(const uint8_t* buf, uint16_t len)
 			{
 				_buf = (const uint8_t*)buf;
 				_len = len;

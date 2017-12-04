@@ -1,5 +1,6 @@
 #include "Hap.h"
 
+
 #include "srp\srp.h"
 
 namespace Hap
@@ -8,8 +9,8 @@ namespace Hap
 	{
 		// current pairing
 		SRP* srp = NULL;					// !NULL = pairing in progress, only one pairing at a time
-		uint8_t srp_pub_key[384];			// pairing iOS device public key
-		uint8_t srp_proof[64];				// pairing iOS device proof
+		uint8_t srp_sess_key[64];			// SRP session key
+		uint8_t srp_data[1024];
 		sid_t srp_owner = sid_invalid;		// session owning the srp
 		uint8_t srp_auth_count = 0;			// auth attempts counter
 
@@ -194,6 +195,10 @@ namespace Hap
 								PairSetup_M3(sess);
 								break;
 
+							case Tlv::State::M5:
+								PairSetup_M5(sess);
+								break;
+
 							default:
 								Log("PairSetup: Unknown state %d\n", (int)state);
 							}
@@ -364,6 +369,10 @@ namespace Hap
 		{
 			int rc;
 			uint16_t size;
+			uint8_t* iosKey = srp_data;
+			uint8_t* iosProof = srp_data + 384;
+			uint16_t iosKey_size = 384;
+			uint16_t iosProof_size = 64;
 			cstr* key = NULL;
 			cstr* rsp = NULL;
 
@@ -387,34 +396,35 @@ namespace Hap
 			}
 
 			// verify that required items are present in input TLV
-			size = sizeof(srp_pub_key);
-			if (!sess->tlvi.get(Tlv::Type::PublicKey, srp_pub_key, size))
+			size = iosKey_size;
+			if (!sess->tlvi.get(Tlv::Type::PublicKey, iosKey, iosKey_size))
 			{
 				Log("PairSetupM3: PublicKey not found\n");
 				goto RetErr;
 			}
 
-			trh("ClientKey", srp_pub_key, size);
+			trh("iosKey", iosKey, iosKey_size);
 
-			size = sizeof(srp_proof);
-			if (!sess->tlvi.get(Tlv::Type::Proof, srp_proof, size))
+			size = iosProof_size;
+			if (!sess->tlvi.get(Tlv::Type::Proof, iosProof, iosProof_size))
 			{
 				Log("PairSetupM3: Proof not found\n");
 				goto RetErr;
 			}
 
-			trh("ClientProof", srp_proof, size);
+			trh("iosProof", iosProof, iosProof_size);
 
-			rc = SRP_compute_key(srp, &key, srp_pub_key, sizeof(srp_pub_key));
+			rc = SRP_compute_key(srp, &key, iosKey, iosKey_size);
 			if (rc != SRP_SUCCESS)
 			{
 				Log("PairSetupM3: SRP_compute_key error %d\n", rc);
 				goto RetErr;
 			}
 
-			trh("SessionKey", key->data, key->length);
+			memcpy(srp_sess_key, key->data, key->length);
+			trh("SessKey", key->data, key->length);
 
-			rc = SRP_verify(srp, srp_proof, size);
+			rc = SRP_verify(srp, iosProof, size);
 			if (rc != SRP_SUCCESS)
 			{
 				Log("PairSetupM3: SRP_verify error %d\n", rc);
@@ -454,5 +464,73 @@ namespace Hap
 			sess->rsp.setContentLength(sess->tlvo.length());
 		}
 
+		void Server::PairSetup_M5(Session* sess)
+		{
+			int rc;
+			uint8_t* iosEncrypted = srp_data;	// encrypted tata from iOS with tag attached
+			uint8_t* iosTag;					// pointer to iOS tag
+			uint8_t* iosTlv;					// decrypted TLV
+			uint8_t* srvTag;					// calculated tag
+			uint16_t iosTlv_size;
+
+			Log("PairSetupM5\n");
+
+			// prepare response without data
+			sess->rsp.start(HTTP_200);
+			sess->rsp.add(ContentType, ContentTypeTlv8);
+			sess->rsp.add(ContentLength, 0);
+			sess->rsp.end();
+
+			// create response TLV in the response buffer right after HTTP headers 
+			sess->tlvo.create(sess->rsp.data(), sess->rsp.size());
+			sess->tlvo.add(Hap::Tlv::Type::State, Hap::Tlv::State::M4);
+
+			// verify that pairing is in progress on current session
+			if (srp == nullptr || srp_owner != sess->Sid())
+			{
+				Log("PairSetupM5: No active pairing\n");
+				goto RetErr;
+			}
+
+			// verify that required items are present in input TLV
+			iosTlv_size = sizeof(srp_data);
+			if (!sess->tlvi.get(Tlv::Type::EncryptedData, iosEncrypted, iosTlv_size))
+			{
+				Log("PairSetupM5: EncryptedData not found\n");
+				goto RetErr;
+			}
+			else
+			{
+				iosTlv = iosEncrypted + iosTlv_size;
+				iosTlv_size -= 16;	// strip off tag
+				iosTag = iosEncrypted + iosTlv_size;
+				srvTag = iosTlv + iosTlv_size;
+
+				Hap::Crypt::Aead aead(Hap::Crypt::Aead::Decrypt, iosTlv, srvTag,
+					srp_sess_key, (const uint8_t *)"\x00\x00\x00\x00PS-Msg05", 
+					iosEncrypted, iosTlv_size);
+
+				trh("iosTlv", iosTlv, iosTlv_size);
+
+				Hap::Tlv::Parse<3> tlv(iosTlv, iosTlv_size);
+				Log("PairSetupM5: TLV item count %d\n", tlv.count());
+			}
+
+			//goto Ret;
+
+		RetErr:	// error, cancel current pairing, if this session owns it
+			if (srp && srp_owner == sess->Sid())
+			{
+				SRP_free(srp);
+				srp = NULL;
+				srp_owner = sid_invalid;
+			}
+			sess->tlvo.add(Hap::Tlv::Type::Error, Hap::Tlv::Error::Unknown);
+
+		Ret:
+
+			// adjust content length in response
+			sess->rsp.setContentLength(sess->tlvo.length());
+		}
 	}
 }
