@@ -10,6 +10,9 @@
     <Filter Include="Hap\srp">
       <UniqueIdentifier>{aac9186e-58a8-4be2-a7e0-ff23a7512f2c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Hap\crypt">
+      <UniqueIdentifier>{4f8fcd2a-e02e-41ea-b29c-5c703e7199db}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Hap\HapAppleCharacteristics.h">
@@ -51,18 +54,6 @@
     <ClInclude Include="..\Hap\srp\cstr.h">
       <Filter>Hap\srp</Filter>
     </ClInclude>
-    <ClInclude Include="..\Hap\srp\logtab.h">
-      <Filter>Hap\srp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Hap\srp\mpi.h">
-      <Filter>Hap\srp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Hap\srp\mpi-config.h">
-      <Filter>Hap\srp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Hap\srp\mpi-types.h">
-      <Filter>Hap\srp</Filter>
-    </ClInclude>
     <ClInclude Include="..\Hap\srp\sha2.h">
       <Filter>Hap\srp</Filter>
     </ClInclude>
@@ -77,6 +68,51 @@
     </ClInclude>
     <ClInclude Include="..\Hap\srp\t_sha.h">
       <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\tommath.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\tommath_class.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\tommath_private.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\srp\tommath_superclass.h">
+      <Filter>Hap\srp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\Hap.h">
+      <Filter>Hap</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\crypt\chacha.h">
+      <Filter>Hap\crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\crypt\ed25519.h">
+      <Filter>Hap\crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\crypt\ed25519_fe.h">
+      <Filter>Hap\crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\crypt\ed25519_fixedint.h">
+      <Filter>Hap\crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\crypt\ed25519_ge.h">
+      <Filter>Hap\crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\crypt\ed25519_precomp_data.h">
+      <Filter>Hap\crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\crypt\ed25519_sc.h">
+      <Filter>Hap\crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\crypt\ed25519_sha512.h">
+      <Filter>Hap\crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\crypt\poly1305.h">
+      <Filter>Hap\crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Hap\HapCrypt.h">
+      <Filter>Hap</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -125,6 +161,40 @@
     </ClCompile>
     <ClCompile Include="..\Hap\srp\t_math.c">
       <Filter>Hap\srp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\ESP\msys32\home\gkaza\esp\hwp\main\hello_world_main.cpp" />
+    <ClCompile Include="..\Hap\crypt\chacha-merged.c">
+      <Filter>Hap\crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\crypt\curve25519.c">
+      <Filter>Hap\crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\crypt\ed25519_fe.c">
+      <Filter>Hap\crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\crypt\ed25519_ge.c">
+      <Filter>Hap\crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\crypt\ed25519_keypair.c">
+      <Filter>Hap\crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\crypt\ed25519_sc.c">
+      <Filter>Hap\crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\crypt\ed25519_sha512.c">
+      <Filter>Hap\crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\crypt\ed25519_sign.c">
+      <Filter>Hap\crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\crypt\ed25519_verify.c">
+      <Filter>Hap\crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\crypt\poly1305-donna.c">
+      <Filter>Hap\crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Hap\HapCrypt.cpp">
+      <Filter>Hap</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

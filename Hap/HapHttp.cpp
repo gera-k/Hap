@@ -233,6 +233,7 @@ namespace Hap
 
 		void Server::PairSetup_M1(Session* sess)
 		{
+			int rc;
 			cstr* pub = NULL;
 
 			Log("PairSetupM1\n");
@@ -295,7 +296,7 @@ namespace Hap
 			srp_owner = sess->Sid();
 			srp_auth_count++;
 
-			int rc = SRP_set_username(srp, "Pair-Setup");
+			rc = SRP_set_username(srp, "Pair-Setup");
 			if (rc != SRP_SUCCESS)
 			{
 				Log("PairSetupM1: SRP_set_username error %d\n", rc);
@@ -321,15 +322,14 @@ namespace Hap
 			trh("Generator", srp_generator, sizeof_srp_generator);
 			trh("Salt", salt, sizeof(salt));
 
-			char* pwd = "000-11-000";				// TODO: get from sequred storage
-			rc = SRP_set_auth_password(srp, pwd);
+			rc = SRP_set_auth_password(srp, Hap::config.setup);
 			if (rc != SRP_SUCCESS)
 			{
 				Log("PairSetupM1: SRP_set_auth_password error %d\n", rc);
 				goto RetErr;
 			}
 
-			trh("Username", pwd, strlen(pwd));
+			trh("Username", Hap::config.setup, strlen(Hap::config.setup));
 
 			rc = SRP_gen_pub(srp, &pub);
 			if (rc != SRP_SUCCESS)
@@ -362,6 +362,8 @@ namespace Hap
 	
 		void Server::PairSetup_M3(Session* sess)
 		{
+			int rc;
+			uint16_t size;
 			cstr* key = NULL;
 			cstr* rsp = NULL;
 
@@ -385,7 +387,7 @@ namespace Hap
 			}
 
 			// verify that required items are present in input TLV
-			uint16_t size = sizeof(srp_pub_key);
+			size = sizeof(srp_pub_key);
 			if (!sess->tlvi.get(Tlv::Type::PublicKey, srp_pub_key, size))
 			{
 				Log("PairSetupM3: PublicKey not found\n");
@@ -403,7 +405,7 @@ namespace Hap
 
 			trh("ClientProof", srp_proof, size);
 
-			int rc = SRP_compute_key(srp, &key, srp_pub_key, sizeof(srp_pub_key));
+			rc = SRP_compute_key(srp, &key, srp_pub_key, sizeof(srp_pub_key));
 			if (rc != SRP_SUCCESS)
 			{
 				Log("PairSetupM3: SRP_compute_key error %d\n", rc);

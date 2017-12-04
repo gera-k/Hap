@@ -55,149 +55,22 @@ int sizeof_srp_modulus = sizeof(srp_modulus);
 const unsigned char srp_generator[] = { 0x05 };
 int sizeof_srp_generator = sizeof(srp_generator);
 
-const unsigned char srp_salt[] = { 
-	0xBE, 0xB2, 0x53, 0x79, 0xD1, 0xA8, 0x58, 0x1E,
-	0xB5, 0xA7, 0x27, 0x67, 0x3A, 0x24, 0x41, 0xEE
-};
-int sizeof_srp_salt = sizeof(srp_salt);
-
+// SHA-512
 #include "sha2.c"
 
+// SPR
 #include "cstr.c"
 #include "t_math.c" 
 #include "srp.c"
 #include "srp6_server.c"
-#include "srp6_client.c"
-//#include "srptest.c"
 
-#if 0
-#include "tommath_class.h"
-#include "bncore.c"
-#include "bn_mp_init.c"
-#include "bn_mp_init_size.c"
-#include "bn_mp_init_copy.c"
-#include "bn_mp_clear.c"
-#include "bn_mp_set_int.c"
-#include "bn_mp_zero.c"
-#include "bn_mp_clamp.c"
-#include "bn_mp_mul_2d.c"
-#include "bn_mp_grow.c"
-#include "bn_mp_copy.c"
-#include "bn_mp_lshd.c"
-#include "bn_mp_rshd.c"
-#include "bn_mp_cmp.c"
-#include "bn_mp_cmp_mag.c"
-#include "bn_mp_cmp_d.c"
-#include "bn_mp_add.c"
-#include "bn_mp_sub.c"
-#include "bn_mp_mul.c"
-#include "bn_mp_mod.c"
-#include "bn_mp_mod_d.c"
-#include "bn_mp_mod_2d.c"
-#include "bn_mp_exch.c"
-#include "bn_mp_div.c"
-#include "bn_mp_div_2d.c"
-#include "bn_mp_add_d.c"
-#include "bn_mp_sub_d.c"
-#include "bn_mp_mul_d.c"
-#include "bn_mp_mulmod.c"
-#include "bn_mp_exptmod.c"
-#include "bn_mp_div_d.c"
-#include "bn_prime_tab.c"
-#include "bn_mp_prime_is_prime.c"
-#include "bn_mp_prime_is_divisible.c"
-#include "bn_mp_prime_miller_rabin.c"
-#include "bn_mp_count_bits.c"
-#include "bn_mp_unsigned_bin_size.c"
-#include "bn_mp_read_signed_bin.c"
-#include "bn_mp_read_unsigned_bin.c"
-#include "bn_mp_to_unsigned_bin.c"
-#include "bn_mp_toradix.c"
-#include "bn_s_mp_add.c"
-#include "bn_s_mp_sub.c"
-#include "bn_mp_set.c"
-#include "bn_mp_cnt_lsb.c"
-#include "bn_mp_sqr.c"
-#include "bn_mp_sqrmod.c"
-#include "bn_mp_radix_smap.c"
-#include "bn_reverse.c"
-#include "bn_mp_clear_multi.c"
-#include "bn_mp_abs.c"
-#include "bn_mp_div_3.c"
-#include "bn_mp_invmod.c"
-#include "bn_mp_dr_is_modulus.c"
-#include "bn_mp_reduce_is_2k.c"
-#include "bn_mp_reduce_is_2k_l.c"
-#include "bn_fast_s_mp_mul_digs.c"
-#include "bn_s_mp_mul_digs.c"
-#include "bn_fast_s_mp_sqr.c"
-#include "bn_s_mp_sqr.c"
-#include "bn_mp_karatsuba_mul.c"
-#include "bn_mp_toom_mul.c"
-#include "bn_mp_karatsuba_sqr.c"
-#include "bn_mp_toom_sqr.c"
-#include "bn_mp_exptmod_fast.c"
-#include "bn_s_mp_exptmod.c"
-#include "bn_mp_init_multi.c"
-#include "bn_mp_div_2.c"
-#include "bn_mp_mul_2.c"
-#include "bn_mp_reduce_setup.c"
-#include "bn_mp_reduce.c"
-#include "bn_mp_montgomery_setup.c"
-#include "bn_mp_montgomery_calc_normalization.c"
-#include "bn_mp_montgomery_reduce.c"
-#include "bn_mp_dr_setup.c"
-#include "bn_mp_dr_reduce.c"
-#include "bn_mp_reduce_2k_setup.c"
-#include "bn_mp_reduce_2k.c"
-#include "bn_mp_reduce_2k_setup_l.c"
-#include "bn_mp_reduce_2k_l.c"
-#include "bn_fast_mp_invmod.c"
-#include "bn_mp_invmod_slow.c"
-#include "bn_fast_mp_montgomery_reduce.c"
-#include "bn_mp_2expt.c"
-#include "bn_s_mp_mul_high_digs.c"
-#include "bn_fast_s_mp_mul_high_digs.c"
-#endif
-
+// tommath-mpi
 #include "mpi.c"
 
-#if 0
-void
-t_mgf1(unsigned char * mask, unsigned masklen, const unsigned char * seed, unsigned seedlen)
-{
-	SHACTX ctxt;
-	unsigned i = 0;
-	unsigned pos = 0;
-	unsigned char cnt[4];
-	unsigned char hout[SHA_DIGESTSIZE];
+//#define SRP_TEST
+#ifdef SRP_TEST
 
-	while (pos < masklen) {
-		cnt[0] = (i >> 24) & 0xFF;
-		cnt[1] = (i >> 16) & 0xFF;
-		cnt[2] = (i >> 8) & 0xFF;
-		cnt[3] = i & 0xFF;
-		SHAInit(&ctxt);
-		SHAUpdate(&ctxt, seed, seedlen);
-		SHAUpdate(&ctxt, cnt, 4);
-
-		if (pos + SHA_DIGESTSIZE > masklen) {
-			SHAFinal(hout, &ctxt);
-			memcpy(mask + pos, hout, masklen - pos);
-			pos = masklen;
-		}
-		else {
-			SHAFinal(mask + pos, &ctxt);
-			pos += SHA_DIGESTSIZE;
-		}
-
-		++i;
-	}
-
-	memset(hout, 0, sizeof(hout));
-	memset((unsigned char *)&ctxt, 0, sizeof(ctxt));
-}
-#endif
+#include "srp6_client.c"
 
 //CLIENT_CTXP(srp)->k, RFC2945_KEY_LEN, s->data, s->length
 void
@@ -207,30 +80,6 @@ t_mgf1(unsigned char * mask, unsigned masklen, const unsigned char * seed, unsig
 	SHAInit(&ctxt);
 	SHAUpdate(&ctxt, seed, seedlen);
 	SHAFinal(mask, &ctxt);
-}
-
-
-void srp_test()
-{
-	SRP* srp = SRP_new(SRP6a_server_method());
-
-	SRP_set_username(srp, "alice");
-
-	SRP_set_params(srp,
-		srp_modulus, sizeof_srp_modulus,
-		srp_generator, sizeof_srp_generator,
-		srp_salt, sizeof_srp_salt
-	);
-
-	SRP_set_auth_password(srp, "password123");
-
-	cstr* pub = NULL;
-	SRP_gen_pub(srp, &pub);
-
-	if (pub)
-		cstr_free(pub);
-
-	SRP_free(srp);
 }
 
 /*
@@ -268,7 +117,7 @@ char *t_tohex(const unsigned char * src, unsigned size)
 const char * user = "alice";
 const char * pass = "password123";
 
-int srp_test2(void)
+int srp_test(void)
 {
 	int i, vflag = 1;
 	SRP * srps;
@@ -287,6 +136,9 @@ int srp_test2(void)
 	printf("[client] sending username '%s'\n\n", user);
 	printf("[client] sending password '%s'\n\n", pass);
 
+	uint8_t salt[16];
+	t_random(salt, sizeof(salt));
+
 	printf("[server] initializing session\n");
 	srps = SRP_new(SRP6a_server_method());
 	if (SRP_set_username(srps, user) < 0) 
@@ -297,7 +149,7 @@ int srp_test2(void)
 	if (SRP_set_params(srps, 
 		srp_modulus, sizeof_srp_modulus,
 		srp_generator, sizeof_srp_generator,
-		srp_salt, sizeof_srp_salt
+		salt, sizeof(salt)
 	) < 0) {
 		printf("SRP_set_params failed\n");
 		return 1;
@@ -318,7 +170,7 @@ int srp_test2(void)
 	if (SRP_set_params(srpc, 
 		srp_modulus, sizeof_srp_modulus,
 		srp_generator, sizeof_srp_generator,
-		srp_salt, sizeof_srp_salt
+		salt, sizeof(salt)
 	) != SRP_SUCCESS) {
 		printf("SRP_set_params failed\n");
 		return 1;
@@ -422,5 +274,5 @@ int srp_test2(void)
 	return 0;
 }
 
-
+#endif
 

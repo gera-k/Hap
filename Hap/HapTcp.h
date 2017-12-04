@@ -8,10 +8,9 @@ namespace Hap
 	class Tcp
 	{
 	protected:
-		Hap::Config* _cfg;
 		Hap::Http::Server* _http;
 	public:
-		static Tcp* Create(Hap::Config* cfg, Hap::Http::Server* _http);
+		static Tcp* Create(Hap::Http::Server* _http);
 		virtual bool Start() = 0;
 		virtual void Stop() = 0;
 	};

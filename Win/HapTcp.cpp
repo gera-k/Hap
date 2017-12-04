@@ -214,7 +214,7 @@ namespace Hap
 			struct sockaddr_in address;
 			address.sin_family = AF_INET;
 			address.sin_addr.s_addr = INADDR_ANY;
-			address.sin_port = _cfg->port;
+			address.sin_port = Hap::config.port;
 			if (bind(server, (struct sockaddr *)&address, sizeof(address))<0)
 			{
 				Log("bind(server, INADDR_ANY) failed");
@@ -246,9 +246,8 @@ namespace Hap
 
 	} tcpWin;
 
-	Tcp* Tcp::Create(Hap::Config* cfg, Hap::Http::Server* http)
+	Tcp* Tcp::Create(Hap::Http::Server* http)
 	{
-		tcpWin._cfg = cfg;
 		tcpWin._http = http;
 		return &tcpWin;
 	}

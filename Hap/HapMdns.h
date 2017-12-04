@@ -8,7 +8,6 @@ namespace Hap
 	class Mdns
 	{
 	protected:
-		Hap::Config* _cfg;
 		char _name[64];			// service name - initially set to _cfg.name
 		char _txt[128];			// txt buffer
 		uint8_t _txt_len = 0;
@@ -19,9 +18,9 @@ namespace Hap
 			int max = sizeof(_txt) - 1;
 			char l;
 
-			if (!_cfg->BCT)
+			if (!Hap::config.BCT)
 			{
-				strcpy(_name, _cfg->name);
+				strcpy(_name, Hap::config.name);
 			}
 			else
 			{
@@ -30,7 +29,7 @@ namespace Hap
 
 			// c# - current Configuration number
 			//		updates only when accessory/service/characteristic is added or removed
-			l = snprintf(p + 1, max,  "c#=%d", _cfg->cn);
+			l = snprintf(p + 1, max,  "c#=%d", Hap::config.cn);
 			max -= l;
 			if (max <= 0) goto Ret;
 			*p++ = l;
@@ -45,14 +44,14 @@ namespace Hap
 			p += l;
 
 			// id - Device ID (randomly generated on each device reset)
-			l = snprintf(p + 1, max, "id=%s", _cfg->id);
+			l = snprintf(p + 1, max, "id=%s", Hap::config.id);
 			max -= l;
 			if (max <= 0) goto Ret;
 			*p++ = l;
 			p += l;
 
 			// md - Model name
-			l = snprintf(p + 1, max, "md=%s", _cfg->model);
+			l = snprintf(p + 1, max, "md=%s", Hap::config.model);
 			max -= l;
 			if (max <= 0) goto Ret;
 			*p++ = l;
@@ -73,14 +72,14 @@ namespace Hap
 			p += l;
 
 			// sf - status flags
-			l = snprintf(p + 1, max, "sf=%u", _cfg->sf);
+			l = snprintf(p + 1, max, "sf=%u", Hap::config.sf);
 			max -= l;
 			if (max <= 0) goto Ret;
 			*p++ = l;
 			p += l;
 
 			// category identifier
-			l = snprintf(p + 1, max, "ci=%d", _cfg->ci);
+			l = snprintf(p + 1, max, "ci=%d", Hap::config.ci);
 			max -= l;
 			if (max <= 0) goto Ret;
 			*p++ = l;
@@ -91,7 +90,7 @@ namespace Hap
 		}
 	
 	public:
-		static Mdns* Create(Hap::Config* cfg);
+		static Mdns* Create();
 		virtual void Start() = 0;
 		virtual void Stop() = 0;
 		virtual void Update() = 0;

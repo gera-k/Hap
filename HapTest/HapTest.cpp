@@ -59,7 +59,7 @@ public:
 	}
 } db;
 
-Hap::Config config =
+Hap::Config Hap::config =
 {
 	"esp32test",				// const char* name;	// Accessory name - used as initial Bonjour name and as
 								//	Accessory Information Service name of aid=1
@@ -69,6 +69,7 @@ Hap::Config config =
 	5,							// uint8_t ci;			// category identifier
 	3,							// uint8_t sf;			// status flags
 
+	"000-11-000",				// const char* setup	// Setup code
 	7889,						// uint16_t port;		// TCP port of HAP service
 
 	0							// bool BCT;			// Bonjour Compatibility Test
@@ -80,15 +81,14 @@ Hap::Http::Server http(db, pairings);
 
 int main()
 {
-	config.port = swap_16(7889);
+	Hap::config.port = swap_16(7889);
 
-	//mp_test();
 	//sha2_test();
-	//srp_test2();
+	//srp_test();
 	//return 0;
 	
-	Hap::Mdns* mdns = Hap::Mdns::Create(&config);
-	Hap::Tcp* tcp = Hap::Tcp::Create(&config, &http);
+	Hap::Mdns* mdns = Hap::Mdns::Create();
+	Hap::Tcp* tcp = Hap::Tcp::Create(&http);
 
 	db.init(1);
 

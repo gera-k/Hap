@@ -32,10 +32,14 @@ namespace Hap
 		uint8_t ci;			// category identifier
 		uint8_t sf;			// status flags
 
+		const char* setup;	// setup code
+
 		uint16_t port;		// TCP port of HAP service in net byte order
 
 		bool BCT;			// Bonjour Compatibility Test
 	};
+
+	extern Config config;
 
 	// HAP session ID
 	//	some DB characteristics and methods depend on HAP session context
@@ -118,6 +122,7 @@ namespace Hap
 }
 
 #include "HapSrp.h"
+#include "HapCrypt.h"
 #include "HapMdns.h"
 #include "HapJson.h"
 #include "HapTlv.h"
