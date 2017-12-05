@@ -1,4 +1,4 @@
-#include "HapCrypt.h"
+#include "Hap.h"
 
 // sha2/hmac
 #include "crypt/sha2.c"
@@ -15,6 +15,9 @@ typedef unsigned char u_char;
 // poly1305
 #include "poly1305-donna.c"
 
+// curve25519
+#include "curve25519.c"
+
 // ed25519
 typedef sha512_ctx sha512_context;
 #include "ed25519_fe.c"
@@ -23,9 +26,6 @@ typedef sha512_ctx sha512_context;
 #include "ed25519_sc.c"
 #include "ed25519_sign.c"
 #include "ed25519_verify.c"
-
-// curve25519
-#include "curve25519.c"
 
 #include "Hap.h"
 
@@ -107,16 +107,10 @@ namespace Hap
 			memcpy(okm, prk, okm_len);
 		}
 
-
-//		int curve25519(
-//			unsigned char *q,
-//			const unsigned char *n,
-//			const unsigned char *p);
-
-		const unsigned char basepoint[32] = { 9 };
-
 		Curve25519::Curve25519()
 		{
+			const unsigned char basepoint[32] = { 9 };
+
 			// generate private key
 			t_random(_prvKey, KeySize);
 
@@ -143,5 +137,50 @@ namespace Hap
 
 			return _secret;
 		}
+
+		Ed25519::Ed25519()
+		{
+
+		}
+		
+		void Ed25519::Init()		// create key pair
+		{
+			uint8_t seed[SeedSize];
+			t_random(seed, SeedSize);
+
+			ed25519_create_keypair(_pubKey, _prvKey, seed);
+		}
+
+		void Ed25519::Init(		// Init from stored key pair
+			const uint8_t *pubKey,
+			const uint8_t *prvKey
+		)
+		{
+			memcpy(_pubKey, pubKey, PubKeySize);
+			memcpy(_prvKey, prvKey, PrvKeySize);
+		}
+
+
+		void Ed25519::Sign(			// sign the message
+			uint8_t *sign,			// signature buffer, SignSize
+			const uint8_t *msg,
+			uint16_t msg_len
+			)
+		{
+			ed25519_sign(sign, msg, msg_len, _pubKey, _prvKey);
+		}
+
+		bool Ed25519::Verify(		// verify signature
+			const uint8_t *sign,
+			const uint8_t *msg,
+			uint16_t msg_len,
+			const uint8_t *pubKey
+		)
+		{
+			int rc = ed25519_verify(sign, msg, msg_len, pubKey);
+
+			return rc != 0;
+		}
+
 	}
 }

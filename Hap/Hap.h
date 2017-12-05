@@ -86,10 +86,20 @@ namespace Hap
 
 		struct Record
 		{
-			Perm perm = None;
+			Perm perm;
 			Id id;
 			Key key;
 		};
+
+		void Init()		// Init pairings - destroy all existing records
+		{
+			for (int i = 0; i < sizeofarr(_db); i++)
+			{
+				Record* rec = &_db[i];
+
+				rec->perm = None;
+			}
+		}
 
 		// count pairing records with matching Permissions
 		//	in perm == None, cput all records

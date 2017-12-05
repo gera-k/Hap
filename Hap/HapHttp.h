@@ -346,6 +346,8 @@ namespace Hap
 		private:
 			Db& _db;						// accessory database
 			Pairings& _pairings;			// pairings database
+			Hap::Crypt::Ed25519& _keys;		// crypto keys
+			
 			class Session					// sessions
 			{
 			public:
@@ -354,6 +356,7 @@ namespace Hap
 				Response rsp;						// HTTP response
 				Hap::Tlv::Parse<MaxHttpTlv> tlvi;	// incoming TLV parser
 				Hap::Tlv::Create tlvo;				// outgoing TLV creator
+				uint8_t sess_key[32];				// Session key 
 
 				// session constructor, executed once during server object initialization
 				Session()
@@ -394,8 +397,8 @@ namespace Hap
 			} _sess[MaxHttpSessions + 1];	// last slot is for handling 'too many sessions' condition
 
 		public:
-			Server(Db& db, Pairings& pairings)
-				: _db(db), _pairings(pairings)
+			Server(Db& db, Pairings& pairings, Hap::Crypt::Ed25519& keys)
+				: _db(db), _pairings(pairings), _keys(keys)
 			{}
 
 			// Open - returns new session ID, 0..sid_max, or sid_invalid

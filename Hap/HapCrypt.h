@@ -1,7 +1,5 @@
-#ifndef _HAP_CRYPTO_H_
-#define _HAP_CRYPTO_H_
-
-#include "Hap.h"
+#ifndef _HAP_CRYPT_H_
+#define _HAP_CRYPT_H_
 
 // Interface to Crypto algorithms
 
@@ -54,7 +52,46 @@ namespace Hap
 			uint8_t _secret[KeySize];
 		};
 
+		class Ed25519
+		{
+		public:
+			constexpr static uint8_t SignSize = 64;
+			constexpr static uint8_t SeedSize = 32;
+			constexpr static uint8_t PubKeySize = 32;
+			constexpr static uint8_t PrvKeySize = 64;
 
+			Ed25519();
+
+			void Init();				// create key pair
+			
+			void Init(					// Init from stored key pair
+				const uint8_t *pubKey,
+				const uint8_t *prvKey
+			);
+
+			// return own public key
+			const uint8_t* PubKey()
+			{
+				return _pubKey;
+			}
+
+			void Sign(					// sign the message
+				uint8_t *sign,			// signature buffer, SignSize
+				const uint8_t *msg, 
+				uint16_t msg_len
+			);
+
+			bool Verify(				// verify signature
+				const uint8_t *sign,	// signature, SignSize
+				const uint8_t *msg,
+				uint16_t msg_len,
+				const uint8_t *pubKey	// other side public key
+			);
+		
+		private:
+			uint8_t _prvKey[PrvKeySize];
+			uint8_t _pubKey[PubKeySize];
+		};
 	}
 }
 

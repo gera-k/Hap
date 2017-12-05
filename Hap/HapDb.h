@@ -1492,7 +1492,7 @@ namespace Hap
 			_prop.set(&_aid,0);
 		}
 
-		// init accessory:
+		// Init accessory:
 		//	- set aid
 		//	- set service/characteristic iids for all services/characteristics
 		//	- return next iid 

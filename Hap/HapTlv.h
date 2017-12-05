@@ -251,9 +251,9 @@ namespace Hap
 			uint16_t _len;		// length of valid TLV
 
 		public:
-			void create(char* buf, uint16_t size)
+			void create(uint8_t* buf, uint16_t size)
 			{
-				_buf = (uint8_t *)buf; 
+				_buf = buf; 
 				_size = size;
 				_len = 0;
 			}
@@ -298,7 +298,7 @@ namespace Hap
 			}
 
 			// Add bytes, up to 255
-			bool addBytes(Type t, uint8_t* d, uint8_t l)
+			bool addBytes(Type t, const uint8_t* d, uint8_t l)
 			{
 				// ensure there is space
 				if (_size - _len < l + 2)
@@ -315,9 +315,9 @@ namespace Hap
 			}
 
 			// Add data, span multiple items as necessary
-			bool add(Type t, uint8_t* data, uint16_t len)
+			bool add(Type t, const uint8_t* data, uint16_t len)
 			{
-				uint8_t* d = data;
+				const uint8_t* d = data;
 
 				while (len > 0)
 				{
