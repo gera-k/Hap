@@ -1,7 +1,7 @@
 #ifndef FE_H
 #define FE_H
 
-#include "ed25519_fixedint.h"
+//#include "ed25519_fixedint.h"
 
 
 /*

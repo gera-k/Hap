@@ -9,7 +9,7 @@ namespace Hap
 	{
 		// current pairing
 		SRP* srp = NULL;					// !NULL = pairing in progress, only one pairing at a time
-		uint8_t srp_sess_key[64];			// SRP session key
+		uint8_t srp_sess_key[32];			// SRP session key
 		uint8_t srp_data[1024];
 		sid_t srp_owner = sid_invalid;		// session owning the srp
 		uint8_t srp_auth_count = 0;			// auth attempts counter
@@ -308,7 +308,7 @@ namespace Hap
 				goto RetErr;
 			}
 
-			trh("Username", srp->username->data, srp->username->length);
+			Hex("Username", srp->username->data, srp->username->length);
 
 			uint8_t salt[16];
 			t_random(salt, 16);
@@ -323,9 +323,9 @@ namespace Hap
 				goto RetErr;
 			}
 
-			trh("Modulus", srp_modulus, sizeof_srp_modulus);
-			trh("Generator", srp_generator, sizeof_srp_generator);
-			trh("Salt", salt, sizeof(salt));
+			Hex("Modulus", srp_modulus, sizeof_srp_modulus);
+			Hex("Generator", srp_generator, sizeof_srp_generator);
+			Hex("Salt", salt, sizeof(salt));
 
 			rc = SRP_set_auth_password(srp, Hap::config.setup);
 			if (rc != SRP_SUCCESS)
@@ -334,7 +334,7 @@ namespace Hap
 				goto RetErr;
 			}
 
-			trh("Username", Hap::config.setup, strlen(Hap::config.setup));
+			Hex("Username", Hap::config.setup, strlen(Hap::config.setup));
 
 			rc = SRP_gen_pub(srp, &pub);
 			if (rc != SRP_SUCCESS)
@@ -343,7 +343,7 @@ namespace Hap
 				goto RetErr;
 			}
 
-			trh("ServerKey", pub->data, pub->length);
+			Hex("ServerKey", pub->data, pub->length);
 
 			sess->tlvo.add(Hap::Tlv::Type::PublicKey, pub->data, (uint16_t)pub->length);
 			sess->tlvo.add(Hap::Tlv::Type::Salt, salt, sizeof(salt));
@@ -403,7 +403,7 @@ namespace Hap
 				goto RetErr;
 			}
 
-			trh("iosKey", iosKey, iosKey_size);
+			Hex("iosKey", iosKey, iosKey_size);
 
 			size = iosProof_size;
 			if (!sess->tlvi.get(Tlv::Type::Proof, iosProof, iosProof_size))
@@ -412,7 +412,7 @@ namespace Hap
 				goto RetErr;
 			}
 
-			trh("iosProof", iosProof, iosProof_size);
+			Hex("iosProof", iosProof, iosProof_size);
 
 			rc = SRP_compute_key(srp, &key, iosKey, iosKey_size);
 			if (rc != SRP_SUCCESS)
@@ -421,8 +421,13 @@ namespace Hap
 				goto RetErr;
 			}
 
-			memcpy(srp_sess_key, key->data, key->length);
-			trh("SessKey", key->data, key->length);
+			Hap::Crypt::hkdf(
+				(const uint8_t*)"Pair-Setup-Encrypt-Salt", sizeof("Pair-Setup-Encrypt-Salt") - 1,
+				key->data, key->length,
+				(const uint8_t*)"Pair-Setup-Encrypt-Info", sizeof("Pair-Setup-Encrypt-Info") - 1,
+				srp_sess_key, sizeof(srp_sess_key));
+
+			Hex("SessKey", srp_sess_key, sizeof(srp_sess_key));
 
 			rc = SRP_verify(srp, iosProof, size);
 			if (rc != SRP_SUCCESS)
@@ -439,7 +444,7 @@ namespace Hap
 				goto RetErr;
 			}
 
-			trh("Response", rsp->data, rsp->length);
+			Hex("Response", rsp->data, rsp->length);
 
 			sess->tlvo.add(Hap::Tlv::Type::Proof, rsp->data, (uint16_t)rsp->length);
 
@@ -466,11 +471,10 @@ namespace Hap
 
 		void Server::PairSetup_M5(Session* sess)
 		{
-			int rc;
-			uint8_t* iosEncrypted = srp_data;	// encrypted tata from iOS with tag attached
-			uint8_t* iosTag;					// pointer to iOS tag
-			uint8_t* iosTlv;					// decrypted TLV
-			uint8_t* srvTag;					// calculated tag
+			uint8_t* iosEncrypted;	// encrypted tata from iOS with tag attached
+			uint8_t* iosTag;		// pointer to iOS tag
+			uint8_t* iosTlv;		// decrypted TLV
+			uint8_t* srvTag;		// calculated tag
 			uint16_t iosTlv_size;
 
 			Log("PairSetupM5\n");
@@ -493,6 +497,7 @@ namespace Hap
 			}
 
 			// verify that required items are present in input TLV
+			iosEncrypted = srp_data;
 			iosTlv_size = sizeof(srp_data);
 			if (!sess->tlvi.get(Tlv::Type::EncryptedData, iosEncrypted, iosTlv_size))
 			{
@@ -501,19 +506,69 @@ namespace Hap
 			}
 			else
 			{
+				Hap::Tlv::Item id;
+				Hap::Tlv::Item ltpk;
+				Hap::Tlv::Item sign;
+
+				// format std_data buffer
 				iosTlv = iosEncrypted + iosTlv_size;
 				iosTlv_size -= 16;	// strip off tag
 				iosTag = iosEncrypted + iosTlv_size;
 				srvTag = iosTlv + iosTlv_size;
 
-				Hap::Crypt::Aead aead(Hap::Crypt::Aead::Decrypt, iosTlv, srvTag,
+				// decrypt iOS data
+				Hap::Crypt::aead(Hap::Crypt::Decrypt, iosTlv, srvTag,
 					srp_sess_key, (const uint8_t *)"\x00\x00\x00\x00PS-Msg05", 
 					iosEncrypted, iosTlv_size);
 
-				trh("iosTlv", iosTlv, iosTlv_size);
+				Hex("iosTlv", iosTlv, iosTlv_size);
+				Hex("iosTag", iosTag, 16);
+				Hex("srvTlv", srvTag, 16);
+
+				if (memcmp(iosTag, srvTag, 16) != 0)
+				{
+					Log("PairSetupM5: authTag does not match\n");
+					sess->tlvo.add(Hap::Tlv::Type::Error, Hap::Tlv::Error::Authentication);
+					goto Ret;
+				}
 
 				Hap::Tlv::Parse<3> tlv(iosTlv, iosTlv_size);
 				Log("PairSetupM5: TLV item count %d\n", tlv.count());
+
+				if (!tlv.get(Hap::Tlv::Type::Identifier, id))
+				{
+					Log("PairSetupM5: Identifier not found\n");
+					goto RetErr;
+				}
+
+				Hex("iosPairingId:", id.val(), id.len());
+
+				if (!tlv.get(Hap::Tlv::Type::PublicKey, ltpk))
+				{
+					Log("PairSetupM5: PublicKey not found\n");
+					goto RetErr;
+				}
+
+				Hex("iosLTPK:", ltpk.val(), ltpk.len());
+
+				if (!tlv.get(Hap::Tlv::Type::Signature, sign))
+				{
+					Log("PairSetupM5: Signature not found\n");
+					goto RetErr;
+				}
+
+				Hex("iosSignature:", sign.val(), sign.len());
+
+				// TODO: verify iOS device signature
+
+				if (!_pairings.Add(id, ltpk, _pairings.Admin))
+				{
+					Log("PairSetupM5: cannot add Pairing record\n");
+					sess->tlvo.add(Hap::Tlv::Type::Error, Hap::Tlv::Error::MaxPeers);
+					goto Ret;
+				}
+
+
 			}
 
 			//goto Ret;

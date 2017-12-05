@@ -59,6 +59,13 @@ namespace Hap
 			Invalid = 0xFE
 		};
 
+		class Item : public std::pair<const uint8_t*, uint8_t>
+		{
+		public:
+			auto val() const { return first; }
+			auto len() const { return second; }
+		};
+
 		template<int MaxTlv>	// Max number of TLVs expected, parsing stops when MaxTlv is reached
 		class Parse
 		{
@@ -142,6 +149,21 @@ namespace Hap
 				return _buf + _off[i] + 2;
 			}
 
+			// get item 
+			bool get(Type t, Item& item)
+			{
+				for (uint8_t i = 0; i < _cnt; i++)
+				{
+					if (type(i) == t)
+					{
+						item.first = value(i);
+						item.second = length(i);
+						return true;
+					}
+				}
+				return false;
+			}
+
 			// extract low-endian integer from item i
 			int getInt(uint8_t i)
 			{
@@ -156,7 +178,6 @@ namespace Hap
 			}
 
 			// extract int/enum value from item with type t
-			//	return false if item does not exist
 			template<typename T>
 			bool get(Type t, T& v)
 			{

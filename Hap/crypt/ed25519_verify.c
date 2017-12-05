@@ -1,7 +1,7 @@
 #include "ed25519.h"
 #include "ed25519_ge.h"
 #include "ed25519_sc.h"
-#include "ed25519_sha512.h"
+//#include "ed25519_sha512.h"
 
 static int consttime_equal(const unsigned char *x, const unsigned char *y) {
     unsigned char r = 0;

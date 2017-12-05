@@ -55,9 +55,6 @@ int sizeof_srp_modulus = sizeof(srp_modulus);
 const unsigned char srp_generator[] = { 0x05 };
 int sizeof_srp_generator = sizeof(srp_generator);
 
-// SHA-512
-#include "sha2.c"
-
 // SPR
 #include "cstr.c"
 #include "t_math.c" 

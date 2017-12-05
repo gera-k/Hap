@@ -1,7 +1,8 @@
 #include "ed25519_sc.h"
 
-#include "ed25519_fixedint.h"
+//#include "ed25519_fixedint.h"
 
+#if 0
 static uint64_t load_3(const unsigned char *in) {
     uint64_t result;
 
@@ -22,7 +23,7 @@ static uint64_t load_4(const unsigned char *in) {
     
     return result;
 }
-
+#endif
 /*
 Input:
   s[0]+256*s[1]+...+256^63*s[63] = s

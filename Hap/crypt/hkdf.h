@@ -11,10 +11,9 @@
 #ifndef HKDF_H_
 #define HKDF_H_
 
-#include <openssl/hmac.h>
+#include <hmac_sha2.h>
 
-unsigned char *HKDF(
-    const EVP_MD *evp_md,
+void hkdf(
     const unsigned char *salt, size_t salt_len,
     const unsigned char *key, size_t key_len,
     const unsigned char *info, size_t info_len,

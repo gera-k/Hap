@@ -9,8 +9,10 @@
 
 #include <functional>
 
+extern "C" void t_random(unsigned char* data, unsigned size);
+
 #define Log printf
-void trh(const char* Header, const void* Buffer, size_t Length);
+void Hex(const char* Header, const void* Buffer, size_t Length);
 
 namespace Hap
 {
@@ -21,8 +23,8 @@ namespace Hap
 	constexpr uint8_t MaxHttpTlv = 10;						// max num of items in incoming TLV
 	constexpr uint16_t MaxHttpFrame = 2 + 1024 + 16;		// max HTTP frame - fits max single encrypted frame (5.5.2 Session securiry)
 
-	// global configuration, persistent across reboots
-	struct Config		
+															// global configuration, persistent across reboots
+	struct Config
 	{
 		const char* name;	// Accessory name - used as initial Bonjour name and as
 							//	Accessory Information Service name of aid=1
@@ -48,12 +50,32 @@ namespace Hap
 	constexpr sid_t sid_invalid = 0xFF;
 	constexpr sid_t sid_max = MaxHttpSessions - 1;
 
+	// forward declarations
+	class Db;
+	class Pairings;
+}
+
+#include "HapSrp.h"
+#include "HapCrypt.h"
+#include "HapMdns.h"
+#include "HapJson.h"
+#include "HapTlv.h"
+#include "HapHttp.h"
+#include "HapTcp.h"
+#include "HapDb.h"
+#include "HapAppleCharacteristics.h"
+#include "HapAppleServices.h"
+
+namespace Hap
+{
 	// pairings DB, persistent across reboots
 	class Pairings
 	{
 	public:
-		using Id = uint8_t[128];
-		using Key = uint8_t[128];
+		constexpr static uint8_t IdLen = 36;
+		constexpr static uint8_t KeyLen = 32;
+		using Id = uint8_t[IdLen];
+		using Key = uint8_t[KeyLen];
 	
 		enum Perm
 		{
@@ -88,48 +110,12 @@ namespace Hap
 			return cnt;
 		}
 
-		bool Add(const Id& id, const Key& key, Perm perm)
-		{
-			for (int i = 0; i < sizeofarr(_db); i++)
-			{
-				Record* rec = &_db[i];
-				if (rec->perm == None)
-				{
-					// add new record
-					memcpy(rec->id, &id, sizeof(Id));
-					memcpy(rec->key, &key, sizeof(Key));
-					rec->perm = perm;
-
-					return true;
-				}
-				else if (memcmp(rec->id, &id, sizeof(Id)) == 0)
-				{
-					// Id matches, TODO
-
-					return true;
-				}
-			}
-
-			return false;
-		}
+		bool Add(const uint8_t* id, uint8_t id_len, const uint8_t* key, Perm perm);
+		bool Add(const Hap::Tlv::Item& id, const Hap::Tlv::Item& key, Perm perm);
 
 	private:
 		Record _db[MaxPairings];
 	};
-
-	// forward declarations
-	class Db;
 }
-
-#include "HapSrp.h"
-#include "HapCrypt.h"
-#include "HapMdns.h"
-#include "HapJson.h"
-#include "HapTlv.h"
-#include "HapHttp.h"
-#include "HapTcp.h"
-#include "HapDb.h"
-#include "HapAppleCharacteristics.h"
-#include "HapAppleServices.h"
 
 #endif
