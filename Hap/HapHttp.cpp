@@ -123,15 +123,15 @@ namespace Hap
 					if (len < 2 + aad + 16)	// wait for complete encrypted block
 						continue;
 
-					// decrypt into request buffer
-					uint8_t* b = (uint8_t*)sess->req.buf();
-					
 					// make 96-bit nonce from receive sequential number
 					uint8_t nonce[12];
 					memset(nonce, 0, sizeof(nonce));
 					memcpy(nonce + 4, &sess->recvSeq, 8);
 
-					Hap::Crypt::aead(Hap::Crypt::Decrypt, 
+					// decrypt into request buffer
+					uint8_t* b = (uint8_t*)sess->req.buf();
+
+					Hap::Crypt::aead(Hap::Crypt::Decrypt,
 						b, b + aad,							// output data and tag positions
 						sess->ControllerToAccessoryKey,		// decryption key
 						nonce,
@@ -142,7 +142,7 @@ namespace Hap
 					sess->recvSeq++;
 
 					// compare passed in and calculated tags
-					if (memcmp(b + len - 16, p + 2 + len - 16, 16) != 0)
+					if (memcmp(b + aad, p + 2 + aad, 16) != 0)
 					{
 						Log("Http: decrypt error\n");
 						return false;
@@ -346,15 +346,15 @@ namespace Hap
 					return false;
 				}
 
-				// encrypt into sess->data buffer
-				uint8_t* b = sess->data;
-
 				// make 96-bit nonce from send sequential number
 				uint8_t nonce[12];
 				memset(nonce, 0, sizeof(nonce));
 				memcpy(nonce + 4, &sess->sendSeq, 8);
 
-				// copy data length into output block
+				// encrypt into sess->data buffer
+				uint8_t* b = sess->data;
+
+				// copy data length into output buffer
 				b[0] = aad & 0xFF;
 				b[1] = (aad >> 8) & 0xFF;
 
