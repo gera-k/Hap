@@ -107,7 +107,7 @@ namespace Hap
 			memcpy(okm, prk, okm_len);
 		}
 
-		Curve25519::Curve25519()
+		void Curve25519::Init()
 		{
 			const unsigned char basepoint[32] = { 9 };
 

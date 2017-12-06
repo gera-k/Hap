@@ -3,22 +3,22 @@
 namespace Hap
 {
 
-	bool Pairings::Add(const uint8_t* id, uint8_t id_len, const uint8_t* key, Perm perm)
+	bool Pairings::Add(const uint8_t* id, uint8_t id_len, const uint8_t* key, Controller::Perm perm)
 	{
 		for (int i = 0; i < sizeofarr(_db); i++)
 		{
-			Record* rec = &_db[i];
-			if (rec->perm == None)
+			Controller* rec = &_db[i];
+			if (rec->perm == Controller::None)
 			{
 				// add new record
-				memset(rec->id, 0, sizeof(Id));
-				memcpy(rec->id, &id, id_len > sizeof(Id) ? sizeof(Id) : id_len);
-				memcpy(rec->key, &key, sizeof(Key));
+				memset(rec->id, 0, Controller::IdLen);
+				memcpy(rec->id, id, id_len > Controller::IdLen ? Controller::IdLen : id_len);
+				memcpy(rec->key, key, Controller::KeyLen);
 				rec->perm = perm;
 
 				return true;
 			}
-			else if (memcmp(rec->id, &id, sizeof(Id)) == 0)
+			else if (memcmp(rec->id, id, id_len) == 0)
 			{
 				// Id matches, TODO
 
@@ -29,21 +29,37 @@ namespace Hap
 		return false;
 	}
 
-	bool Pairings::Add(const Hap::Tlv::Item& id, const Hap::Tlv::Item& key, Perm perm)
+	bool Pairings::Add(const Hap::Tlv::Item& id, const Hap::Tlv::Item& key, Controller::Perm perm)
 	{
-		if (id.len() > IdLen)
+		if (id.len() > Controller::IdLen)
 		{
 			Log("Pairings: Invalid ID length %d\n", id.len());
 			return false;
 		}
 
-		if (key.len() != KeyLen)
+		if (key.len() != Controller::KeyLen)
 		{
 			Log("Pairings: Invalid key length %d\n", key.len());
 			return false;
 		}
 
 		return Add(id.val(), id.len(), key.val(), perm);
+	}
+
+	const Controller* Pairings::Get(const Hap::Tlv::Item& id)
+	{
+		if (id.len() > Controller::IdLen)
+			return nullptr;
+
+		for (int i = 0; i < sizeofarr(_db); i++)
+		{
+			Controller* ios = &_db[i];
+
+			if (memcmp(ios->id, id.val(), id.len()) == 0)
+				return ios;
+		}
+
+		return nullptr;
 	}
 }
 

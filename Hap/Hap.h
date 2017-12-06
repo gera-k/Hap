@@ -24,6 +24,22 @@ namespace Hap
 	constexpr uint16_t MaxHttpFrame = 2 + 1024 + 16;		// max HTTP frame - fits max single encrypted frame (5.5.2 Session securiry)
 
 															// global configuration, persistent across reboots
+
+	namespace Bonjour
+	{
+		enum FeatureFlag
+		{
+			SupportsHapPairing = 1,
+		};
+
+		enum StatusFlag
+		{
+			NotPaired = 0x01,
+			NotConfiguredForWiFi = 0x02,
+			ProblemDetected = 0x04
+		};
+	}
+
 	struct Config
 	{
 		const char* name;	// Accessory name - used as initial Bonjour name and as
@@ -39,6 +55,8 @@ namespace Hap
 		uint16_t port;		// TCP port of HAP service in net byte order
 
 		bool BCT;			// Bonjour Compatibility Test
+
+		std::function<void()> MdnsUpdate;
 	};
 
 	extern Config config;
@@ -49,6 +67,27 @@ namespace Hap
 	using sid_t = uint8_t;
 	constexpr sid_t sid_invalid = 0xFF;
 	constexpr sid_t sid_max = MaxHttpSessions - 1;
+
+	// iOS device
+	struct Controller
+	{
+		constexpr static uint8_t IdLen = 36;	// max size of controller ID
+		constexpr static uint8_t KeyLen = 32;	// size of controller public key
+		using Id = uint8_t[IdLen];
+		using Key = uint8_t[KeyLen];
+
+		// permissions
+		enum Perm
+		{
+			None = 0xFF,
+			Regular = 0,
+			Admin = 1,
+		};
+
+		Perm perm;
+		Id id;
+		Key key;
+	};
 
 	// forward declarations
 	class Db;
@@ -72,59 +111,43 @@ namespace Hap
 	class Pairings
 	{
 	public:
-		constexpr static uint8_t IdLen = 36;
-		constexpr static uint8_t KeyLen = 32;
-		using Id = uint8_t[IdLen];
-		using Key = uint8_t[KeyLen];
 	
-		enum Perm
-		{
-			None = 0xFF,	// pairing record is not in use
-			Regular = 0,
-			Admin = 1,
-		};
-
-		struct Record
-		{
-			Perm perm;
-			Id id;
-			Key key;
-		};
-
 		void Init()		// Init pairings - destroy all existing records
 		{
 			for (int i = 0; i < sizeofarr(_db); i++)
 			{
-				Record* rec = &_db[i];
+				Controller* ios = &_db[i];
 
-				rec->perm = None;
+				ios->perm = Controller::None;
 			}
 		}
 
 		// count pairing records with matching Permissions
 		//	in perm == None, cput all records
-		uint8_t Count(Perm perm = None)
+		uint8_t Count(Controller::Perm perm = Controller::None)
 		{
 			uint8_t cnt = 0;
 			for (int i = 0; i < sizeofarr(_db); i++)
 			{
-				Record* rec = &_db[i];
+				Controller* ios = &_db[i];
 				
-				if (rec->perm == None)
+				if (ios->perm == Controller::None)
 					continue;
 
-				if (perm == None || perm == rec->perm)
+				if (perm == Controller::None || perm == ios->perm)
 					cnt++;
 			}
 
 			return cnt;
 		}
 
-		bool Add(const uint8_t* id, uint8_t id_len, const uint8_t* key, Perm perm);
-		bool Add(const Hap::Tlv::Item& id, const Hap::Tlv::Item& key, Perm perm);
+		bool Add(const uint8_t* id, uint8_t id_len, const uint8_t* key, Controller::Perm perm);
+		bool Add(const Hap::Tlv::Item& id, const Hap::Tlv::Item& key, Controller::Perm perm);
+
+		const Controller* Get(const Hap::Tlv::Item& id);
 
 	private:
-		Record _db[MaxPairings];
+		Controller _db[MaxPairings];
 	};
 }
 

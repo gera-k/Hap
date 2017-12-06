@@ -64,7 +64,7 @@ int sizeof_srp_generator = sizeof(srp_generator);
 // tommath-mpi
 #include "mpi.c"
 
-#define SRP_TEST
+//#define SRP_TEST
 #ifdef SRP_TEST
 
 #include "srp6_client.c"

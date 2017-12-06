@@ -38,7 +38,10 @@ namespace Hap
 		public:
 			constexpr static uint8_t KeySize = 32;
 			
-			Curve25519();
+			Curve25519() {}
+
+			// init keys - create new key pair
+			void Init();
 
 			// return own public key
 			const uint8_t* getPublicKey();

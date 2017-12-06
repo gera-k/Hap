@@ -78,23 +78,30 @@ int main()
 	//srp_test();
 	//return 0;
 	
+	// create and start servers
+	Hap::Mdns* mdns = Hap::Mdns::Create();
+	Hap::Tcp* tcp = Hap::Tcp::Create(&http);
+
 	// Init global data	TODO: save/restore to/from storage
 	Hap::config.name = "esp32test";				// const char* name;	// Accessory name - used as initial Bonjour name and as	Accessory Information Service name of aid=1
 	Hap::config.model = "TestModel";			// const char* model;	// Model name (Bonjour and AIS)
 	Hap::config.id = "00:11:22:33:44:55";		// const char* id;		// Device ID (XX:XX:XX:XX:XX:XX, generated new on factory reset)
-	Hap::config.cn = 1;							// uint32_t cn;		// Current configuration number, incremented on db change
+	Hap::config.cn = 1;							// uint32_t cn;			// Current configuration number, incremented on db change
 	Hap::config.ci = 5;							// uint8_t ci;			// category identifier
-	Hap::config.sf = 3;							// uint8_t sf;			// status flags
+	Hap::config.sf = 0							// uint8_t sf;			// status flags
+		| Hap::Bonjour::NotPaired
+		| Hap::Bonjour::NotConfiguredForWiFi;
 	Hap::config.setup = "000-11-000";			// const char* setup	// Setup code
 	Hap::config.port = swap_16(7889);			// uint16_t port;		// TCP port of HAP service
 	Hap::config.BCT = 0;
+
+	Hap::config.MdnsUpdate = [mdns]() -> void {
+		mdns->Update();
+	};
+
 	db.Init(1);
 	pairings.Init();
 	keys.Init();
-
-	// create and start servers
-	Hap::Mdns* mdns = Hap::Mdns::Create();
-	Hap::Tcp* tcp = Hap::Tcp::Create(&http);
 
 	mdns->Start();
 	tcp->Start();

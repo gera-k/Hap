@@ -340,7 +340,7 @@ namespace Hap
 		};
 
 		// Http Server object
-		//	- all access to Http object must be externally serialized
+		//	- all access to Http Server object must be externally serialized
 		class Server
 		{
 		private:
@@ -356,7 +356,16 @@ namespace Hap
 				Response rsp;						// HTTP response
 				Hap::Tlv::Parse<MaxHttpTlv> tlvi;	// incoming TLV parser
 				Hap::Tlv::Create tlvo;				// outgoing TLV creator
-				uint8_t sess_key[32];				// Session key 
+				
+				// session-wide data
+				Hap::Crypt::Curve25519 curve;		// Session securiry keys (used on Pair Verivication phase)
+				const Controller* ios;				// paired iOS device - if not NULL then the session is secured
+				uint8_t AccessoryToControllerKey[32];
+				uint8_t ControllerToAccessoryKey[32];
+				
+				// session temp data
+				uint8_t key[32];
+				uint8_t data[512];
 
 				// session constructor, executed once during server object initialization
 				Session()
@@ -367,12 +376,14 @@ namespace Hap
 				{
 					_sid = sid;
 					opened = true;
+					ios = nullptr;
 				}
 
 				void Close()
 				{
 					opened = false;
 					_sid = sid_invalid;
+					ios = nullptr;
 				}
 
 				bool isOpen()
@@ -435,6 +446,8 @@ namespace Hap
 			void PairSetup_M1(Session* sess);
 			void PairSetup_M3(Session* sess);
 			void PairSetup_M5(Session* sess);
+			void PairVerify_M1(Session* sess);
+			void PairVerify_M3(Session* sess);
 		};
 	}
 }
