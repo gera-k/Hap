@@ -362,49 +362,53 @@ namespace Hap
 				const Controller* ios;				// paired iOS device - if not NULL then the session is secured
 				uint8_t AccessoryToControllerKey[32];
 				uint8_t ControllerToAccessoryKey[32];
+				uint32_t recvSeq;
+				uint32_t sendSeq;
 				
 				// session temp data
 				uint8_t key[32];
-				uint8_t data[512];
+				uint8_t data[MaxHttpFrame];
 
 				// session constructor, executed once during server object initialization
 				Session()
-					: req(req_b, sizeof(req_b)), rsp(rsp_b, sizeof(rsp_b))
+					: req(_req, sizeof(_req)), rsp(_rsp, sizeof(_rsp))
 				{}
 
 				void Open(sid_t sid)
 				{
 					_sid = sid;
-					opened = true;
+					_opened = true;
 					ios = nullptr;
+					recvSeq = 0;
+					sendSeq = 0;
 				}
 
 				void Close()
 				{
-					opened = false;
+					_opened = false;
 					_sid = sid_invalid;
 					ios = nullptr;
 				}
 
 				bool isOpen()
 				{
-					return opened;
+					return _opened;
 				}
 
 				sid_t Sid()
 				{
-					if (opened)
+					if (_opened)
 						return _sid;
 					return sid_invalid;
 				}
 
 			private:
 				// the following fields are valid from session open to close
-				bool opened = false;		// true when session is opened
+				bool _opened = false;		// true when session is opened
 				sid_t _sid = sid_invalid;	// valid when opened
 
-				char req_b[MaxHttpFrame];	// request buffer
-				char rsp_b[MaxHttpFrame];	// response buffer
+				char _req[MaxHttpFrame];	// request buffer
+				char _rsp[MaxHttpFrame];	// response buffer
 			} _sess[MaxHttpSessions + 1];	// last slot is for handling 'too many sessions' condition
 
 		public:

@@ -47,7 +47,7 @@ namespace Hap
 			const uint8_t* getPublicKey();
 
 			// generate shared secret from own private key and other public key
-			const uint8_t* getSharedSecret(const uint8_t* pubKey);
+			const uint8_t* getSharedSecret(const uint8_t* pubKey = nullptr);
 
 		private:
 			uint8_t _prvKey[KeySize];

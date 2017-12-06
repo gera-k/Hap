@@ -7,10 +7,9 @@ namespace Hap
 {
 	namespace Http
 	{
-		// current pairing
+		// current pairing session - only one simultaneous pairing is allowed
 		SRP* srp = NULL;					// !NULL = pairing in progress, only one pairing at a time
 		uint8_t srp_shared_secret[64];		// SRP shared secret
-		uint8_t srp_data[1024];
 		sid_t srp_owner = sid_invalid;		// session owning the srp
 		uint8_t srp_auth_count = 0;			// auth attempts counter
 
@@ -78,17 +77,19 @@ namespace Hap
 				return false;
 			}
 
+			// prepare for request parsing
 			sess->req.init();
 
 			// read and parse the HTTP request
-			uint16_t len = 0;		// total len of valid data in req
+			uint16_t len = 0;		// total len of valid data received so far
+			uint16_t http_len;		// length of http request
 			while (true)
 			{
-				char* req = sess->req.buf() + len;
-				uint16_t req_len = sess->req.size() - len;
+				uint8_t* req = sess->data + len;
+				uint16_t req_len = sizeof(sess->data) - len;
 				
 				// read next portion of the request
-				int l = recv(sid, ctx, req, req_len);
+				int l = recv(sid, ctx, (char*)req, req_len);
 				if (l < 0)	// read error
 				{
 					Log("Http: Read Error\n");
@@ -102,13 +103,63 @@ namespace Hap
 
 				len += l;
 
-				// TODO: it session is secured, decode the next portion, if whole block is received
 				if (sess->ios != nullptr)
 				{
+					// it session is secured, decrypt the block - when the whole block is received
+					//	max length of http data that can be processed is defined by MaxHttpFrame/MaxHttpBlock
+
+					if (len < 2)	// wait fot at least two bytes of data length 
+						continue;
+					
+					uint8_t *p = sess->data;
+					uint16_t aad = p[0] + ((uint16_t)(p[1]) << 8);	// data length, also serves as AAD for decryption
+
+					if (aad > MaxHttpBlock)
+					{
+						Log("Http: encrypted block size is too big: %d\n", aad);
+						return false;
+					}
+
+					if (len < 2 + aad + 16)	// wait for complete encrypted block
+						continue;
+
+					// decrypt into request buffer
+					uint8_t* b = (uint8_t*)sess->req.buf();
+					
+					// make 96-bit nonce from receive sequential number
+					uint8_t nonce[12];
+					memset(nonce, 0, sizeof(nonce));
+					memcpy(nonce + 4, &sess->recvSeq, 8);
+
+					Hap::Crypt::aead(Hap::Crypt::Decrypt, 
+						b, b + aad,							// output data and tag positions
+						sess->ControllerToAccessoryKey,		// decryption key
+						nonce,
+						p + 2, aad,							// encrypted data
+						p, 2								// aad
+					);
+
+					sess->recvSeq++;
+
+					// compare passed in and calculated tags
+					if (memcmp(b + len - 16, p + 2 + len - 16, 16) != 0)
+					{
+						Log("Http: decrypt error\n");
+						return false;
+					}
+
+					http_len = aad;
+				}
+				else
+				{
+					// otherwise copy received data into request buffer as is
+					memcpy(sess->req.buf(), sess->data, len);
+
+					http_len = len;
 				}
 
-				// parse HTTP request
-				auto status = sess->req.parse(len);
+				// try parsing HTTP request
+				auto status = sess->req.parse(http_len);
 				if (status == sess->req.Error)	// parser error
 				{
 					// TODO: make response Internal server error
@@ -117,7 +168,16 @@ namespace Hap
 				}
 
 				if (status == sess->req.Success)
+					// request parsed, stop reading 
 					break;
+
+				if (sess->ios != nullptr)
+				{
+					// if session is sequred then whole request must fit into single frame
+					// TODO: support multiple frames
+					Log("Http: request doesn not fit into single frame\n");
+					return false;
+				}
 
 				// request incomplete - try reading more data
 			}
@@ -274,7 +334,49 @@ namespace Hap
 				//		/characteristics
 			}
 
-			send(sid, ctx, sess->rsp.buf(), sess->rsp.len());
+			if (sess->ios != nullptr)
+			{
+				// session secured - encrypt data
+				uint8_t *p = (uint8_t*)sess->rsp.buf();
+				uint16_t aad = sess->rsp.len();				// data length, and AAD for encryption
+
+				if (aad > MaxHttpBlock)
+				{
+					Log("Http: response size is too big: %d\n", aad);
+					return false;
+				}
+
+				// encrypt into sess->data buffer
+				uint8_t* b = sess->data;
+
+				// make 96-bit nonce from send sequential number
+				uint8_t nonce[12];
+				memset(nonce, 0, sizeof(nonce));
+				memcpy(nonce + 4, &sess->sendSeq, 8);
+
+				// copy data length into output block
+				b[0] = aad & 0xFF;
+				b[1] = (aad >> 8) & 0xFF;
+
+				Hap::Crypt::aead(Hap::Crypt::Encrypt,
+					b + 2, b + 2 + aad,					// output data and tag positions
+					sess->AccessoryToControllerKey,		// encryption key
+					nonce,
+					p, aad,								// data to encrypt
+					b, 2								// aad
+				);
+
+				sess->sendSeq++;
+
+				// send encrypted block
+				send(sid, ctx, (char*)b, 2 + aad + 16);
+			}
+			else
+			{
+				//send response as is
+				send(sid, ctx, sess->rsp.buf(), sess->rsp.len());
+			}
+
 			return true;
 		}
 
@@ -411,8 +513,8 @@ namespace Hap
 		{
 			int rc;
 			uint16_t size;
-			uint8_t* iosKey = srp_data;
-			uint8_t* iosProof = srp_data + 384;
+			uint8_t* iosKey = sess->data;
+			uint8_t* iosProof = sess->data + 384;
 			uint16_t iosKey_size = 384;
 			uint16_t iosProof_size = 64;
 			cstr* key = NULL;
@@ -540,9 +642,9 @@ namespace Hap
 				goto RetErr;
 			}
 
-			// extract encrypted data into srp_data buffer
-			iosEncrypted = srp_data;
-			iosTlv_size = sizeof(srp_data);
+			// extract encrypted data into sess->data buffer
+			iosEncrypted = sess->data;
+			iosTlv_size = sizeof(sess->data);
 			if (!sess->tlvi.get(Tlv::Type::EncryptedData, iosEncrypted, iosTlv_size))
 			{
 				Log("PairSetupM5: EncryptedData not found\n");
@@ -554,7 +656,7 @@ namespace Hap
 				Hap::Tlv::Item ltpk;
 				Hap::Tlv::Item sign;
 
-				// format srp_data buffer
+				// format sess->data buffer
 				iosTlv = iosEncrypted + iosTlv_size;	// decrypted TLV
 				iosTlv_size -= 16;						// strip off tag
 				iosTag = iosEncrypted + iosTlv_size;	// iOS tag location
@@ -614,9 +716,9 @@ namespace Hap
 				}
 
 				// buid Accessory Info and sign it
-				uint8_t* AccesoryInfo = srp_data;	// re-use srp_data buffer
+				uint8_t* AccesoryInfo = sess->data;	// re-use sess->data buffer
 				uint8_t* p = AccesoryInfo;
-				int l = sizeof(srp_data);
+				int l = sizeof(sess->data);
 
 				// add AccessoryX
 				Hap::Crypt::hkdf(
@@ -662,7 +764,7 @@ namespace Hap
 				);
 
 				l -= subTlv.length() + 16;
-				Log("PairSetupM5: srp_data unused: %d\n", l);
+				Log("PairSetupM5: sess->data unused: %d\n", l);
 
 				// add encryped info and tag to output TLV
 				sess->tlvo.add(Hap::Tlv::Type::EncryptedData, p, subTlv.length() + 16);
@@ -809,9 +911,9 @@ namespace Hap
 			sess->tlvo.create((uint8_t*)sess->rsp.data(), sess->rsp.size());
 			sess->tlvo.add(Hap::Tlv::Type::State, Hap::Tlv::State::M4);
 
-			// extract encrypted data into srp_data buffer
-			iosEncrypted = srp_data;
-			iosTlv_size = sizeof(srp_data);
+			// extract encrypted data into sess->data buffer
+			iosEncrypted = sess->data;
+			iosTlv_size = sizeof(sess->data);
 			if (!sess->tlvi.get(Tlv::Type::EncryptedData, iosEncrypted, iosTlv_size))
 			{
 				Log("PairVerifyM3: EncryptedData not found\n");
@@ -822,7 +924,7 @@ namespace Hap
 				Hap::Tlv::Item id;
 				Hap::Tlv::Item sign;
 
-				// format srp_data buffer
+				// format sess->data buffer
 				iosTlv = iosEncrypted + iosTlv_size;	// decrypted TLV
 				iosTlv_size -= 16;						// strip off tag
 				iosTag = iosEncrypted + iosTlv_size;	// iOS tag location
@@ -874,6 +976,19 @@ namespace Hap
 				}
 
 				// TODO: construct iOSDeviceInfo and verify signature
+
+				// create session encryption keys
+				Hap::Crypt::hkdf(
+					(const uint8_t*)"Control-Salt", sizeof("Control-Salt") - 1,
+					sess->curve.getSharedSecret(), sess->curve.KeySize,
+					(const uint8_t*)"Control-Read-Encryption-Key", sizeof("Control-Read-Encryption-Key") - 1,
+					sess->AccessoryToControllerKey, sizeof(sess->AccessoryToControllerKey));
+
+				Hap::Crypt::hkdf(
+					(const uint8_t*)"Control-Salt", sizeof("Control-Salt") - 1,
+					sess->curve.getSharedSecret(), sess->curve.KeySize,
+					(const uint8_t*)"Control-Write-Encryption-Key", sizeof("Control-Write-Encryption-Key") - 1,
+					sess->ControllerToAccessoryKey, sizeof(sess->ControllerToAccessoryKey));
 
 				// mark session as secured
 				sess->ios = ios;

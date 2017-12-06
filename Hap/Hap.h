@@ -21,9 +21,8 @@ namespace Hap
 	constexpr uint8_t MaxHttpSessions = 8;					// max HTTP sessions (5.2.3 TCP requirements)
 	constexpr uint8_t MaxHttpHeaders = 20;					// max number of HTTP headers in request
 	constexpr uint8_t MaxHttpTlv = 10;						// max num of items in incoming TLV
-	constexpr uint16_t MaxHttpFrame = 2 + 1024 + 16;		// max HTTP frame - fits max single encrypted frame (5.5.2 Session securiry)
-
-															// global configuration, persistent across reboots
+	constexpr uint16_t MaxHttpBlock = 1024;					// max size of encrypted block (5.5.2 Session securiry)
+	constexpr uint16_t MaxHttpFrame = MaxHttpBlock + 2 + 16;// max HTTP frame 
 
 	namespace Bonjour
 	{

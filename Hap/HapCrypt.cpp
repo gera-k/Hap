@@ -133,7 +133,8 @@ namespace Hap
 		const uint8_t* Curve25519::getSharedSecret(const uint8_t* pubKey)
 		{
 
-			curve25519(_secret, _prvKey, pubKey);
+			if (pubKey != nullptr)
+				curve25519(_secret, _prvKey, pubKey);
 
 			return _secret;
 		}
