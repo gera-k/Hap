@@ -40,22 +40,22 @@ namespace Hap
 		};
 
 		enum class Type : uint8_t
-		{
-			Method = 0x00,
-			Identifier = 0x01,
-			Salt = 0x02,
-			PublicKey = 0x03,
-			Proof = 0x04,
-			EncryptedData = 0x05,
-			State = 0x06,
-			Error = 0x07,
-			RetryDelay = 0x08,
-			Certificate = 0x09,
-			Signature = 0x0A,
-			Permissions = 0x0B,
-			FragmentData = 0x0C,
-			Fragmentlast = 0x0D,
-			Separator = 0xFF,
+		{							// Format
+			Method = 0x00,			//	integer
+			Identifier = 0x01,		//	UTF-8
+			Salt = 0x02,			//	bytes
+			PublicKey = 0x03,		//	bytes
+			Proof = 0x04,			//	bytes
+			EncryptedData = 0x05,	//	bytes
+			State = 0x06,			//	integer
+			Error = 0x07,			//	integer
+			RetryDelay = 0x08,		//	integer
+			Certificate = 0x09,		//	bytes
+			Signature = 0x0A,		//	bytes
+			Permissions = 0x0B,		//	integer
+			FragmentData = 0x0C,	//	bytes
+			Fragmentlast = 0x0D,	//	bytes
+			Separator = 0xFF,		//	null
 			Invalid = 0xFE
 		};
 
@@ -261,6 +261,21 @@ namespace Hap
 			uint16_t length()
 			{
 				return _len;
+			}
+
+			// add zero-size item
+			bool add(Type t)
+			{
+				// ensure space for at least 2 bytes
+				if (_size - _len < 2)
+					return false;
+
+				uint8_t* b = _buf + _len;	// tlv start
+				*b++ = uint8_t(t);			// store type
+				*b++ = 0;					// store zero length
+
+				_len = b - _buf;
+				return true;
 			}
 
 			// add Integer, use as many bytes as necessary

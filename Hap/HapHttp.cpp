@@ -69,6 +69,7 @@ namespace Hap
 				return false;
 
 			Session* sess = &_sess[sid];
+			bool secured = sess->secured;
 
 			if (sid == MaxHttpSessions)	// too many sessions
 			{
@@ -78,7 +79,7 @@ namespace Hap
 			}
 
 			// prepare for request parsing
-			sess->req.init();
+			sess->Init();
 
 			// read and parse the HTTP request
 			uint16_t len = 0;		// total len of valid data received so far
@@ -103,7 +104,7 @@ namespace Hap
 
 				len += l;
 
-				if (sess->ios != nullptr)
+				if (sess->secured)
 				{
 					// it session is secured, decrypt the block - when the whole block is received
 					//	max length of http data that can be processed is defined by MaxHttpFrame/MaxHttpBlock
@@ -171,7 +172,7 @@ namespace Hap
 					// request parsed, stop reading 
 					break;
 
-				if (sess->ios != nullptr)
+				if (sess->secured)
 				{
 					// if session is sequred then whole request must fit into single frame
 					// TODO: support multiple frames
@@ -207,7 +208,7 @@ namespace Hap
 
 				if (p.second == 9 && strncmp(p.first, "/identify", 9) == 0)
 				{
-					if (0 && _pairings.Count() == 0)
+					if (_pairings.Count() == 0)
 					{
 						Log("Http: Exec unpaired identify\n");
 						sess->rsp.start(HTTP_204);
@@ -303,6 +304,7 @@ namespace Hap
 
 							case Tlv::State::M3:
 								PairVerify_M3(sess);
+								secured = sess->ios != nullptr;
 								break;
 
 							default:
@@ -313,7 +315,79 @@ namespace Hap
 				}
 				else if (p.second == 9 && strncmp(p.first, "/pairings", 9) == 0)
 				{
+					int len;
+					if (!sess->secured)
+					{
+						Log("Http: Authorization required\n");
+						sess->rsp.start(HTTP_470);
+						sess->rsp.end();
+					}
+					else if (!sess->req.hdr(ContentType, ContentTypeTlv8))
+					{
+						Log("Http: Unknown or missing ContentType\n");
+						sess->rsp.start(HTTP_400);
+						sess->rsp.end();
+					}
+					else if (!sess->req.hdr(ContentLength, len))
+					{
+						Log("Http: Unknown or missing ContentLength\n");
+						sess->rsp.start(HTTP_400);
+						sess->rsp.end();
+					}
+					else
+					{
+						sess->tlvi.parse(d.first, d.second);
+						Log("Pairings: TLV item count %d\n", sess->tlvi.count());
 
+						Tlv::State state;
+						if (!sess->tlvi.get(Tlv::Type::State, state))
+						{
+							Log("Pairings: State not found\n");
+							sess->rsp.start(HTTP_400);
+							sess->rsp.end();
+						}
+						else
+						{
+							if(state != Tlv::State::M1)
+							{
+								Log("Pairings: Invalid State\n");
+								sess->rsp.start(HTTP_400);
+								sess->rsp.end();
+							}
+							else
+							{
+								Tlv::Method method;
+								if (!sess->tlvi.get(Tlv::Type::Method, method))
+								{
+									Log("Pairings: Method not found\n");
+									sess->rsp.start(HTTP_400);
+									sess->rsp.end();
+								}
+								else
+								{
+									switch (method)
+									{
+									case Tlv::Method::AddPairing:
+										PairingAdd(sess);
+										break;
+
+									case Tlv::Method::RemovePairing:
+										PairingRemove(sess);
+										break;
+
+									case Tlv::Method::ListPairing:
+										PairingList(sess);
+										break;
+
+									default:
+										Log("Pairings: Unknown method\n");
+										sess->rsp.start(HTTP_400);
+										sess->rsp.end();
+									}
+								}
+							}
+						}
+					}
 				}
 				else
 				{
@@ -327,17 +401,48 @@ namespace Hap
 				// GET
 				//		/accessories
 				//		/characteristics
+				if (p.second == 12 && strncmp(p.first, "/accessories", 12) == 0)
+				{
+					sess->rsp.start(HTTP_200);
+					sess->rsp.add(ContentType, ContentTypeJson);
+					sess->rsp.add(ContentLength, 0);
+					sess->rsp.end();
+
+					int len = _db.getDb(sess->Sid(), sess->rsp.data(), sess->rsp.size());
+
+					sess->rsp.setContentLength(len);
+				}
+				else if(p.second == 16 && strncmp(p.first, "/characteristics", 16) == 0)
+				{
+					GetCharacteristics(sess);
+				}
+				else
+				{
+					Log("Http: Unknown path %.*s\n", p.second, p.first);
+					sess->rsp.start(HTTP_400);
+					sess->rsp.end();
+				}
 			}
 			else if (m.second == 3 && strncmp(m.first, "PUT", 3) == 0)
 			{
 				// PUT
 				//		/characteristics
+				if(p.second == 16 && strncmp(p.first, "/characteristics", 16) == 0)
+				{
+					PutCharacteristics(sess);
+				}
+				else
+				{
+					Log("Http: Unknown path %.*s\n", p.second, p.first);
+					sess->rsp.start(HTTP_400);
+					sess->rsp.end();
+				}
 			}
 
-			if (sess->ios != nullptr)
+			if (sess->secured)
 			{
 				// session secured - encrypt data
-				uint8_t *p = (uint8_t*)sess->rsp.buf();
+				const uint8_t *p = (uint8_t*)sess->rsp.buf();
 				uint16_t aad = sess->rsp.len();				// data length, and AAD for encryption
 
 				if (aad > MaxHttpBlock)
@@ -353,6 +458,7 @@ namespace Hap
 
 				// encrypt into sess->data buffer
 				uint8_t* b = sess->data;
+				memset(b, 0, sizeof(sess->data));
 
 				// copy data length into output buffer
 				b[0] = aad & 0xFF;
@@ -376,6 +482,8 @@ namespace Hap
 				//send response as is
 				send(sid, ctx, sess->rsp.buf(), sess->rsp.len());
 			}
+
+			sess->secured = secured;
 
 			return true;
 		}
@@ -770,7 +878,7 @@ namespace Hap
 				sess->tlvo.add(Hap::Tlv::Type::EncryptedData, p, subTlv.length() + 16);
 
 				Hap::config.sf &= ~Hap::Bonjour::NotPaired;
-				Hap::config.MdnsUpdate();
+				Hap::config.Update();
 
 				goto RetDone;	// pairing complete
 			}
@@ -990,7 +1098,7 @@ namespace Hap
 					(const uint8_t*)"Control-Write-Encryption-Key", sizeof("Control-Write-Encryption-Key") - 1,
 					sess->ControllerToAccessoryKey, sizeof(sess->ControllerToAccessoryKey));
 
-				// mark session as secured
+				// mark session as secured after response is sent
 				sess->ios = ios;
 
 				goto Ret;
@@ -1002,6 +1110,205 @@ namespace Hap
 		Ret:
 			// adjust content length in response
 			sess->rsp.setContentLength(sess->tlvo.length());
+		}
+
+		void Server::PairingAdd(Session* sess)
+		{
+			Tlv::Item id;
+			Tlv::Item key;
+			Controller::Perm perm;
+			const Controller* ios;
+
+			Log("PairingAdd\n");
+
+			// prepare response without data
+			sess->rsp.start(HTTP_200);
+			sess->rsp.add(ContentType, ContentTypeTlv8);
+			sess->rsp.add(ContentLength, 0);
+			sess->rsp.end();
+
+			// create response TLV in the response buffer right after HTTP headers 
+			sess->tlvo.create((uint8_t*)sess->rsp.data(), sess->rsp.size());
+			sess->tlvo.add(Hap::Tlv::Type::State, Hap::Tlv::State::M2);
+
+			// verify that controller has admin permissions
+			if (sess->ios->perm != Controller::Admin)
+			{
+				Log("PairingAdd: No Admin permissions\n");
+				sess->tlvo.add(Hap::Tlv::Type::Error, Hap::Tlv::Error::Authentication);
+				goto Ret;
+			}
+
+			// extract required items from input TLV 
+			if (!sess->tlvi.get(Tlv::Type::Identifier, id))
+			{
+				Log("PairingAdd: Identifier not found\n");
+				goto RetErr;
+			}
+			Hex("PairingAdd: Identifier", id.val(), id.len());
+
+			if (!sess->tlvi.get(Tlv::Type::PublicKey, key))
+			{
+				Log("PairingAdd: PublicKey not found\n");
+				goto RetErr;
+			}
+			Hex("PairingAdd: PublicKey", key.val(), key.len());
+
+			if (!sess->tlvi.get(Tlv::Type::Permissions, perm))
+			{
+				Log("PairingAdd: Permissions not found\n");
+				goto RetErr;
+			}
+			Log("PairingAdd: Permissions 0x%X", perm);
+
+			// locate new controller in pairing db
+			ios = _pairings.Get(id);
+			if (ios != nullptr)
+			{
+				// compare controller LTPK with stored one
+				if (key.len() != Controller::KeyLen || memcmp(key.val(), ios->key, Controller::KeyLen) != 0)
+				{
+					Log("PairingAdd: mismatch\n");
+					goto RetErr;
+				}
+
+				_pairings.Update(id, perm);
+			}
+			else if (!_pairings.Add(id, key, perm))
+			{
+				Log("PairingAdd: Unable to add\n");
+				sess->tlvo.add(Hap::Tlv::Type::Error, Hap::Tlv::Error::MaxPeers);
+				goto Ret;
+			}
+
+			goto Ret;
+
+		RetErr:	// error
+			sess->tlvo.add(Hap::Tlv::Type::Error, Hap::Tlv::Error::Unknown);
+
+		Ret:
+			// adjust content length in response
+			sess->rsp.setContentLength(sess->tlvo.length());
+		}
+
+		void Server::PairingRemove(Session* sess)
+		{
+			Tlv::Item id;
+
+			Log("PairingRemove\n");
+
+			// prepare response without data
+			sess->rsp.start(HTTP_200);
+			sess->rsp.add(ContentType, ContentTypeTlv8);
+			sess->rsp.add(ContentLength, 0);
+			sess->rsp.end();
+
+			// create response TLV in the response buffer right after HTTP headers 
+			sess->tlvo.create((uint8_t*)sess->rsp.data(), sess->rsp.size());
+			sess->tlvo.add(Hap::Tlv::Type::State, Hap::Tlv::State::M2);
+
+			// verify that controller has admin permissions
+			if (sess->ios->perm != Controller::Admin)
+			{
+				Log("PairingRemove: No Admin permissions\n");
+				sess->tlvo.add(Hap::Tlv::Type::Error, Hap::Tlv::Error::Authentication);
+				goto Ret;
+			}
+
+			// extract required items from input TLV 
+			if (!sess->tlvi.get(Tlv::Type::Identifier, id))
+			{
+				Log("PairingRemove: Identifier not found\n");
+				goto RetErr;
+			}
+			Hex("PairingAdd: Identifier", id.val(), id.len());
+
+			if (!_pairings.Remove(id))
+			{
+				Log("PairingRemove: Remove error\n");
+				goto RetErr;
+			}
+
+			// TODO: close all sessions to removed controller
+
+			goto Ret;
+
+		RetErr:	// error
+			sess->tlvo.add(Hap::Tlv::Type::Error, Hap::Tlv::Error::Unknown);
+
+		Ret:
+			// adjust content length in response
+			sess->rsp.setContentLength(sess->tlvo.length());
+		}
+
+		void Server::PairingList(Session* sess)
+		{
+			Log("PairingList\n");
+
+			// prepare response without data
+			sess->rsp.start(HTTP_200);
+			sess->rsp.add(ContentType, ContentTypeTlv8);
+			sess->rsp.add(ContentLength, 0);
+			sess->rsp.end();
+
+			// create response TLV in the response buffer right after HTTP headers 
+			sess->tlvo.create((uint8_t*)sess->rsp.data(), sess->rsp.size());
+			sess->tlvo.add(Hap::Tlv::Type::State, Hap::Tlv::State::M2);
+
+			// verify that controller has admin permissions
+			if (sess->ios->perm != Controller::Admin)
+			{
+				Log("PairingList: No Admin permissions\n");
+				sess->tlvo.add(Hap::Tlv::Type::Error, Hap::Tlv::Error::Authentication);
+				goto Ret;
+			}
+
+			bool first = true;
+			bool rc = _pairings.forEach([sess, first](const Controller* ios) -> bool {
+
+				if (!first)
+				{
+					if (!sess->tlvo.add(Hap::Tlv::Type::Separator))
+						return false;
+				}
+
+				if (!sess->tlvo.add(Hap::Tlv::Type::Identifier, ios->id, ios->IdLen))	// TODO: store real ID length (or zero-terminate?)
+					return false;
+
+				if (!sess->tlvo.add(Hap::Tlv::Type::PublicKey, ios->key, ios->KeyLen))
+					return false;
+
+				if (!sess->tlvo.add(Hap::Tlv::Type::Permissions, ios->perm))
+					return false;
+
+				return true;
+			});
+
+			if(rc)
+				goto Ret;
+
+		//RetErr:	// error
+			Log("PairingList: TLV overflow\n");
+			sess->tlvo.add(Hap::Tlv::Type::Error, Hap::Tlv::Error::Unknown);
+
+		Ret:
+			// adjust content length in response
+			sess->rsp.setContentLength(sess->tlvo.length());
+		}
+
+		void Server::GetAccessories(Session* sess)
+		{
+
+		}
+
+		void Server::GetCharacteristics(Session* sess)
+		{
+
+		}
+
+		void Server::PutCharacteristics(Session* sess)
+		{
+
 		}
 	}
 }

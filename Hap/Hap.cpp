@@ -2,6 +2,32 @@
 
 namespace Hap
 {
+	void Pairings::Init()		// Init pairings - destroy all existing records
+	{
+		for (int i = 0; i < sizeofarr(_db); i++)
+		{
+			Controller* ios = &_db[i];
+
+			ios->perm = Controller::None;
+		}
+	}
+
+	uint8_t Pairings::Count(Controller::Perm perm)
+	{
+		uint8_t cnt = 0;
+		for (int i = 0; i < sizeofarr(_db); i++)
+		{
+			Controller* ios = &_db[i];
+
+			if (ios->perm == Controller::None)
+				continue;
+
+			if (perm == Controller::None || perm == ios->perm)
+				cnt++;
+		}
+
+		return cnt;
+	}
 
 	bool Pairings::Add(const uint8_t* id, uint8_t id_len, const uint8_t* key, Controller::Perm perm)
 	{
@@ -46,6 +72,47 @@ namespace Hap
 		return Add(id.val(), id.len(), key.val(), perm);
 	}
 
+	bool Pairings::Update(const Hap::Tlv::Item& id, Controller::Perm perm)
+	{
+		if (id.len() > Controller::IdLen)
+			return false;
+
+		for (int i = 0; i < sizeofarr(_db); i++)
+		{
+			Controller* ios = &_db[i];
+
+			if (ios->perm == Controller::None)	// empty record
+				continue;
+
+			if (memcmp(ios->id, id.val(), id.len()) == 0)
+			{
+				ios->perm = perm;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool Pairings::Remove(const Hap::Tlv::Item& id)
+	{
+		if (id.len() > Controller::IdLen)
+			return false;
+
+		for (int i = 0; i < sizeofarr(_db); i++)
+		{
+			Controller* ios = &_db[i];
+
+			if (memcmp(ios->id, id.val(), id.len()) == 0)
+			{
+				ios->perm = Controller::None;	// mark record empty
+				return true;
+			}
+		}
+
+		return true;
+	}
+
 	const Controller* Pairings::Get(const Hap::Tlv::Item& id)
 	{
 		if (id.len() > Controller::IdLen)
@@ -55,11 +122,30 @@ namespace Hap
 		{
 			Controller* ios = &_db[i];
 
+			if (ios->perm == Controller::None)	// empty record
+				continue;
+
 			if (memcmp(ios->id, id.val(), id.len()) == 0)
 				return ios;
 		}
 
 		return nullptr;
+	}
+
+	bool Pairings::forEach(std::function<bool(const Controller*)> cb)
+	{
+		for (int i = 0; i < sizeofarr(_db); i++)
+		{
+			Controller* ios = &_db[i];
+
+			if (ios->perm == Controller::None)	// empty record
+				continue;
+
+			if (!cb(ios))
+				return false;
+		}
+
+		return true;
 	}
 }
 

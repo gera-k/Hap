@@ -86,13 +86,10 @@ namespace Hap
 				Incomplete = 1,
 			};
 
-			Parser(char *buf, uint16_t size)
-				: _buf(buf), _size(size)
+			void init(char *buf, uint16_t size)
 			{
-			}
-
-			void init()
-			{
+				_buf = buf;
+				_size = size;
 				_method_len = 0;
 				_path_len = 0;
 				_num_headers = 0;
@@ -221,15 +218,17 @@ namespace Hap
 		class Response
 		{
 		private:
-			char* _buf;
+			char* _buf = nullptr;
 			uint16_t _max = 0;
 			uint16_t _len = 0;
 			uint16_t _len_pos = 0;
 
 		public:
-			Response(char* buf, uint16_t size)
-				: _buf(buf), _max(size)
-			{}
+			void init(char* buf, uint16_t size)
+			{
+				_buf = buf;
+				_max = size;
+			}
 
 			// return response buffer
 			char* buf()
@@ -254,7 +253,7 @@ namespace Hap
 			// return size of data area
 			uint16_t size()
 			{
-				return _max - _len;
+				return _max;
 			}
 
 			bool start(Status status)
@@ -359,26 +358,24 @@ namespace Hap
 				
 				// session-wide data
 				Hap::Crypt::Curve25519 curve;		// Session securiry keys (used on Pair Verivication phase)
-				const Controller* ios;				// paired iOS device - if not NULL then the session is secured
+				const Controller* ios;				// paired iOS device
+				bool secured;						// session is secured
 				uint8_t AccessoryToControllerKey[32];
 				uint8_t ControllerToAccessoryKey[32];
-				uint32_t recvSeq;
-				uint32_t sendSeq;
+				uint64_t recvSeq;
+				uint64_t sendSeq;
 				
 				// session temp data
 				uint8_t key[32];
 				uint8_t data[MaxHttpFrame];
 
 				// session constructor, executed once during server object initialization
-				Session()
-					: req(_req, sizeof(_req)), rsp(_rsp, sizeof(_rsp))
-				{}
-
 				void Open(sid_t sid)
 				{
 					_sid = sid;
 					_opened = true;
 					ios = nullptr;
+					secured = false;
 					recvSeq = 0;
 					sendSeq = 0;
 				}
@@ -388,11 +385,18 @@ namespace Hap
 					_opened = false;
 					_sid = sid_invalid;
 					ios = nullptr;
+					secured = false;
 				}
 
 				bool isOpen()
 				{
 					return _opened;
+				}
+
+				void Init()
+				{
+					rsp.init(_rsp, sizeof(_rsp));
+					req.init(_req, sizeof(_req));
 				}
 
 				sid_t Sid()
@@ -452,6 +456,12 @@ namespace Hap
 			void PairSetup_M5(Session* sess);
 			void PairVerify_M1(Session* sess);
 			void PairVerify_M3(Session* sess);
+			void PairingAdd(Session* sess);
+			void PairingRemove(Session* sess);
+			void PairingList(Session* sess);
+			void GetAccessories(Session* sess);
+			void GetCharacteristics(Session* sess);
+			void PutCharacteristics(Session* sess);
 		};
 	}
 }

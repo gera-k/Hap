@@ -17,7 +17,8 @@ void Hex(const char* Header, const void* Buffer, size_t Length);
 namespace Hap
 {
 	// global constants
-	constexpr uint8_t MaxPairings = 16;						// max number of pairings the accessory supports (4.11 Add pairing)
+	constexpr uint8_t MaxPairings = 10 /*16*/;				// max number of pairings the accessory supports (4.11 Add pairing)
+															//	10 for now, until > 1024 byte frames are supported	TODO: fix
 	constexpr uint8_t MaxHttpSessions = 8;					// max HTTP sessions (5.2.3 TCP requirements)
 	constexpr uint8_t MaxHttpHeaders = 20;					// max number of HTTP headers in request
 	constexpr uint8_t MaxHttpTlv = 10;						// max num of items in incoming TLV
@@ -44,18 +45,18 @@ namespace Hap
 		const char* name;	// Accessory name - used as initial Bonjour name and as
 							//	Accessory Information Service name of aid=1
 		const char* model;	// Model name (Bonjour and AIS)
-		const char* id;		// Device ID (XX:XX:XX:XX:XX:XX, generated new on factory reset)
+		const char* id;		// Device ID (XX:XX:XX:XX:XX:XX, new id generated on each factory reset)
 		uint32_t cn;		// Current configuration number, incremented on db change
 		uint8_t ci;			// category identifier
 		uint8_t sf;			// status flags
 
-		const char* setup;	// setup code
+		const char* setup;	// setup code XXX-XX-XXX
 
 		uint16_t port;		// TCP port of HAP service in net byte order
 
 		bool BCT;			// Bonjour Compatibility Test
 
-		std::function<void()> MdnsUpdate;
+		std::function<void()> Update;	// config update notification
 	};
 
 	extern Config config;
@@ -111,39 +112,27 @@ namespace Hap
 	{
 	public:
 	
-		void Init()		// Init pairings - destroy all existing records
-		{
-			for (int i = 0; i < sizeofarr(_db); i++)
-			{
-				Controller* ios = &_db[i];
-
-				ios->perm = Controller::None;
-			}
-		}
+		// Init pairings - destroy all existing records
+		void Init();
 
 		// count pairing records with matching Permissions
 		//	in perm == None, cput all records
-		uint8_t Count(Controller::Perm perm = Controller::None)
-		{
-			uint8_t cnt = 0;
-			for (int i = 0; i < sizeofarr(_db); i++)
-			{
-				Controller* ios = &_db[i];
-				
-				if (ios->perm == Controller::None)
-					continue;
+		uint8_t Count(Controller::Perm perm = Controller::None);
 
-				if (perm == Controller::None || perm == ios->perm)
-					cnt++;
-			}
-
-			return cnt;
-		}
-
+		// add pairing record, returns false if failed
 		bool Add(const uint8_t* id, uint8_t id_len, const uint8_t* key, Controller::Perm perm);
 		bool Add(const Hap::Tlv::Item& id, const Hap::Tlv::Item& key, Controller::Perm perm);
 
+		// update controller permissions
+		bool Update(const Hap::Tlv::Item& id, Controller::Perm perm);
+
+		// remove controller
+		bool Remove(const Hap::Tlv::Item& id);
+
+		// get pairing record, returns nullptr if not found
 		const Controller* Get(const Hap::Tlv::Item& id);
+
+		bool Pairings::forEach(std::function<bool(const Controller*)> cb);
 
 	private:
 		Controller _db[MaxPairings];

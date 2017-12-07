@@ -95,7 +95,7 @@ int main()
 	Hap::config.port = swap_16(7889);			// uint16_t port;		// TCP port of HAP service
 	Hap::config.BCT = 0;
 
-	Hap::config.MdnsUpdate = [mdns]() -> void {
+	Hap::config.Update = [mdns]() -> void {
 		mdns->Update();
 	};
 
