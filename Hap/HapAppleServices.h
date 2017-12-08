@@ -29,6 +29,8 @@ namespace Hap
 		Characteristic::SerialNumber _serialNumber;
 		Characteristic::FirmwareRevision _firmwareRevision;
 
+		void Add(Characteristic::HardwareRevision& ch) { AddCharacteristic(&ch, 6); }
+
 	public:
 		static constexpr const char* Type = "3E";
 

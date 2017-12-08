@@ -42,19 +42,21 @@ namespace Hap
 
 	struct Config
 	{
-		const char* name;	// Accessory name - used as initial Bonjour name and as
-							//	Accessory Information Service name of aid=1
-		const char* model;	// Model name (Bonjour and AIS)
-		const char* id;		// Device ID (XX:XX:XX:XX:XX:XX, new id generated on each factory reset)
-		uint32_t cn;		// Current configuration number, incremented on db change
-		uint8_t ci;			// category identifier
-		uint8_t sf;			// status flags
+		const char* manufacturer;		// Manufacturer- used by AIS (Accessory Information Service)
+		const char* name;				// Accessory name - used as initial Bonjour name and as AIS name of aid=1
+		const char* model;				// Model name (Bonjour and AIS)
+		const char* serialNumber;		// Serial number in arbitrary format
+		const char* firmwareRevision;	// Major[.Minor[.Revision]]
+		const char* id;					// Device ID (XX:XX:XX:XX:XX:XX, new id generated on each factory reset)
+		uint32_t cn;					// Current configuration number, incremented on db change
+		uint8_t ci;						// category identifier
+		uint8_t sf;						// status flags
 
-		const char* setup;	// setup code XXX-XX-XXX
+		const char* setup;				// setup code XXX-XX-XXX
 
-		uint16_t port;		// TCP port of HAP service in net byte order
+		uint16_t port;					// TCP port of HAP service in net byte order
 
-		bool BCT;			// Bonjour Compatibility Test
+		bool BCT;						// Bonjour Compatibility Test
 
 		std::function<void()> Update;	// config update notification
 	};

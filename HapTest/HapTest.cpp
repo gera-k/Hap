@@ -15,7 +15,17 @@ public:
 			Log("MyAccessoryInformation: write Identify\n");
 		});
 	}
-};
+
+	void config()
+	{
+		_manufacturer.Value(Hap::config.manufacturer);
+		_model.Value(Hap::config.model);
+		_name.Value(Hap::config.name);
+		_serialNumber.Value(Hap::config.serialNumber);
+		_firmwareRevision.Value(Hap::config.firmwareRevision);
+	}
+
+} myAis;
 
 class MyLb : public Hap::Lightbulb
 {
@@ -30,69 +40,63 @@ public:
 			Log("MyLb: write On: %d -> %d\n", On().Value(), v);
 		});
 	}
-};
+
+} myLb;
 
 class MyAcc : public Hap::Accessory<2>
 {
-private:
-	MyAccessoryInformation ai;
-	MyLb lb;
 public:
 	MyAcc() : Hap::Accessory<2>()
 	{
-		AddService(&ai);
-		AddService(&lb);
+		AddService(&myAis);
+		AddService(&myLb);
 	}
-};
+
+} myAcc;
 
 class MyDb : public Hap::DbStatic<1>
 {
-private:
-	MyAcc acc;
 public:
 	MyDb()
 	{
-		AddAcc(&acc);
+		AddAcc(&myAcc);
 	}
 
 	// db initialization:
-	//	set aids
 	void Init(Hap::iid_t aid)
 	{
-		acc.init(aid);
-		auto a = GetAcc(1);
-		auto b = GetAcc(2);
+		// assign instance IDs
+		myAcc.setId(aid);
 
-		printf("acc %p  a %p  b %p\n", &acc, a, b);
+		// config AIS
+		myAis.config();
 	}
-};
+
+} myDb;
 
 // static/global data of this accessory server
 //	data must be initialized on first time start or on reset
 //	some data must be stored in non-volatile storage and restored upon startup
 Hap::Config Hap::config;
+
+// static objects (take good amout of mem so don't allocate them on stack)
 MyDb db;					// accessory attribute database
 Hap::Pairings pairings;		// pairing records 
 Hap::Crypt::Ed25519 keys;	// crypto keys			
-
-// main HTTP server
 Hap::Http::Server http(db, pairings, keys);
 
 int main()
 {
-	Hap::config.port = swap_16(7889);
-
-	//sha2_test();
-	//srp_test();
-	//return 0;
-	
-	// create and start servers
+	// create servers
 	Hap::Mdns* mdns = Hap::Mdns::Create();
 	Hap::Tcp* tcp = Hap::Tcp::Create(&http);
 
 	// Init global data	TODO: save/restore to/from storage
+	Hap::config.manufacturer = "TestMaker";		// Manufacturer- used by AIS (Accessory Information Service)
 	Hap::config.name = "esp32test";				// const char* name;	// Accessory name - used as initial Bonjour name and as	Accessory Information Service name of aid=1
 	Hap::config.model = "TestModel";			// const char* model;	// Model name (Bonjour and AIS)
+	Hap::config.serialNumber = "0001";			// Serial number in arbitrary format
+	Hap::config.firmwareRevision = "0.1";		// Major[.Minor[.Revision]]
 	Hap::config.id = "00:11:22:33:44:55";		// const char* id;		// Device ID (XX:XX:XX:XX:XX:XX, generated new on factory reset)
 	Hap::config.cn = 1;							// uint32_t cn;			// Current configuration number, incremented on db change
 	Hap::config.ci = 5;							// uint8_t ci;			// category identifier
@@ -107,17 +111,28 @@ int main()
 		mdns->Update();
 	};
 
+	// init static objects
 	db.Init(1);
 	pairings.Init();
 	keys.Init();
 
+#if 1
+	// start servers
 	mdns->Start();
 	tcp->Start();
 
-#if 0
-//	Hap::sid_t sid = srv.Open();
+	// wait for interrupt
+	char c;
+	std::cin >> c;
 
-	char str[256];
+	// stop servers
+	tcp->Stop();
+	mdns->Stop();
+
+#else
+	Hap::sid_t sid = http.Open();
+
+	static char str[1024];
 	int l;
 
 	l = db.getDb(sid, str, sizeof(str) - 1);
@@ -125,17 +140,26 @@ int main()
 	printf("sizeof(srv)=%d  db '%s'\n",
 		sizeof(db), str);
 
+	http.Close(sid);
+
+	//sha2_test();
+	//srp_test();
+	//return 0;
+
+#endif
+
+#if 0
 	static const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":2,\"value\":true,\"ev\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
-//	const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":8,\"value\":true}]}";
+	//	const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":8,\"value\":true}]}";
 	static char rsp[256];
 	int rsp_size = sizeof(rsp);
 
-	auto rc = db.Write(sid, wr, sizeof(wr)-1, rsp, rsp_size);
+	auto rc = db.Write(sid, wr, sizeof(wr) - 1, rsp, rsp_size);
 	Log("Write: %s  rsp '%.*s'\n", Hap::Http::StatusStr(rc), rsp_size, rsp);
 
 	static const char rd[] = "id=1.2,3.1&ev=1&meta=1&perms=1&type=1";
 	rsp_size = sizeof(rsp);
-	rc = db.Read(sid, rd, sizeof(rd)-1, rsp, rsp_size);
+	rc = db.Read(sid, rd, sizeof(rd) - 1, rsp, rsp_size);
 	Log("Read: %s  rsp '%.*s'\n", Hap::Http::StatusStr(rc), rsp_size, rsp);
 
 	rsp_size = sizeof(rsp);
@@ -147,15 +171,6 @@ int main()
 	Log("Events: %s  rsp %d '%.*s'\n", Hap::Http::StatusStr(rc), rsp_size, rsp_size, rsp);
 
 	tcpServer();
-#else
-	char c;
-	std::cin >> c;
-#endif
-
-	tcp->Stop();
-	mdns->Stop();
-
-#if 0
 	srv.Process(sid, nullptr,
 	[](Hap::sid_t sid, void* ctx, uint8_t* buf, uint16_t& size) -> bool {
 
@@ -175,7 +190,6 @@ int main()
 		return true;
 	});
 
-	srv.Close(sid);
 #endif
 
 

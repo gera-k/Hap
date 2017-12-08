@@ -272,6 +272,10 @@ namespace Hap
 		{
 			return snprintf(s, max, "\"%s\"", v);
 		}
+		static inline bool Write(const Hap::Json::Obj& js, int t, type& v)
+		{
+			return false;
+		}
 	};
 	template<> struct hap_type<FormatId::Format>
 	{
@@ -1004,7 +1008,8 @@ namespace Hap
 			Simple(Hap::Property::Type::T type, Property::Permissions::T perms)
 				: B(type, perms, F)
 			{
-				B::AddProperty(&_value);
+				if( perms & Property::Permissions::PairedRead)
+					B::AddProperty(&_value);
 			}
 
 			// get/set the value
@@ -1496,7 +1501,7 @@ namespace Hap
 		//	- set aid
 		//	- set service/characteristic iids for all services/characteristics
 		//	- return next iid 
-		iid_t init(iid_t aid, iid_t iid = 1)
+		iid_t setId(iid_t aid, iid_t iid = 1)
 		{
 			_aid.set(aid);
 

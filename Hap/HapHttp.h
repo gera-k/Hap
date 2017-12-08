@@ -459,7 +459,6 @@ namespace Hap
 			void PairingAdd(Session* sess);
 			void PairingRemove(Session* sess);
 			void PairingList(Session* sess);
-			void GetAccessories(Session* sess);
 			void GetCharacteristics(Session* sess);
 			void PutCharacteristics(Session* sess);
 		};

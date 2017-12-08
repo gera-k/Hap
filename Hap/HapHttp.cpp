@@ -410,11 +410,28 @@ namespace Hap
 
 					int len = _db.getDb(sess->Sid(), sess->rsp.data(), sess->rsp.size());
 
+					Log("Db: '%.*s'\n", len, sess->rsp.data());
+
 					sess->rsp.setContentLength(len);
 				}
-				else if(p.second == 16 && strncmp(p.first, "/characteristics", 16) == 0)
+				else if(strncmp(p.first, "/characteristics?", 17) == 0)
 				{
-					GetCharacteristics(sess);
+
+					int len = sizeof(sess->data);
+					auto status = _db.Read(sess->Sid(), p.first + 17, p.second - 17, (char*)sess->data, len);
+
+					Log("Read: Status %d  '%.*s'\n", status, len, sess->data);
+
+					sess->rsp.start(status);
+					if (len > 0)
+					{
+						sess->rsp.add(ContentType, ContentTypeJson);
+						sess->rsp.end((const char*)sess->data, len);
+					}
+					else
+					{
+						sess->rsp.end();
+					}
 				}
 				else
 				{
@@ -1221,7 +1238,7 @@ namespace Hap
 				Log("PairingRemove: Identifier not found\n");
 				goto RetErr;
 			}
-			Hex("PairingAdd: Identifier", id.val(), id.len());
+			Hex("PairingRemove: Identifier", id.val(), id.len());
 
 			if (!_pairings.Remove(id))
 			{
@@ -1294,11 +1311,6 @@ namespace Hap
 		Ret:
 			// adjust content length in response
 			sess->rsp.setContentLength(sess->tlvo.length());
-		}
-
-		void Server::GetAccessories(Session* sess)
-		{
-
 		}
 
 		void Server::GetCharacteristics(Session* sess)

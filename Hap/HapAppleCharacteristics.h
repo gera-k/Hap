@@ -16,7 +16,25 @@ namespace Hap
 
 			FirmwareRevision(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedWrite
+				Hap::Property::Permissions::PairedRead
+			)
+			{
+				Value(value);
+			}
+		};
+
+		// Hardware Revision
+		//	UUID 00000053-0000-1000-8000-0026BB765291
+		//	Permissions		Paired Read
+		//	Format			string
+		class HardwareRevision : public Simple< 0, FormatId::ConstStr>
+		{
+		public:
+			static constexpr const char* Type = "52";
+
+			HardwareRevision(Simple::V value = nullptr) : Simple(
+				Type,
+				Hap::Property::Permissions::PairedRead
 			)
 			{
 				Value(value);
@@ -53,7 +71,7 @@ namespace Hap
 
 			Manufacturer(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedWrite
+				Hap::Property::Permissions::PairedRead
 			)
 			{
 				Value(value);
@@ -72,7 +90,7 @@ namespace Hap
 
 			Model(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedWrite
+				Hap::Property::Permissions::PairedRead
 			)
 			{
 				Value(value);
@@ -91,7 +109,7 @@ namespace Hap
 
 			Name(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedWrite
+				Hap::Property::Permissions::PairedRead
 			)
 			{
 				Value(value);
@@ -140,7 +158,7 @@ namespace Hap
 
 			SerialNumber(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedWrite
+				Hap::Property::Permissions::PairedRead
 			)
 			{
 				Value(value);
