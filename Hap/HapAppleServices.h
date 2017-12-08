@@ -3,6 +3,49 @@
 
 namespace Hap
 {
+	// Accessory Information
+	//	
+	//	UUID 0000003E-0000-1000-8000-0026BB765291
+	//	Type public.hap.service.accessory-information
+	//	Required Characteristics 
+	//		0 Identify
+	//		1 Manufacturer
+	//		2 Model
+	//		3 Name
+	//		4 Serial Number
+	//		5 Firmware Revision
+	//	Optional Characteristics
+	//		6 Hardware Revision
+	//		7 Accessory Flags
+	// defines space for 8 characteristics and adds Required ones.
+	//	custom extentions may add optonal ones 
+	class AccessoryInformation : public Service<8>	// reserve space for 8 characteristics
+	{
+	protected:
+		Characteristic::Identify _identify;
+		Characteristic::Manufacturer _manufacturer;
+		Characteristic::Model _model;
+		Characteristic::Name _name;
+		Characteristic::SerialNumber _serialNumber;
+		Characteristic::FirmwareRevision _firmwareRevision;
+
+	public:
+		static constexpr const char* Type = "3E";
+
+		AccessoryInformation(
+			Property::PrimaryService::T primary = false,
+			Property::HiddenService::T hidden = false
+		) : Service(Type)
+		{
+			AddCharacteristic(&_identify, 0);
+			AddCharacteristic(&_manufacturer, 1);
+			AddCharacteristic(&_model, 2);
+			AddCharacteristic(&_name, 3);
+			AddCharacteristic(&_serialNumber, 4);
+			AddCharacteristic(&_firmwareRevision, 5);
+		}
+	};
+
 	// Lightbulb
 	//	This service describes a lightbulb.
 	//	UUID 00000043-0000-1000-8000-0026BB765291
@@ -15,7 +58,7 @@ namespace Hap
 	//		3 Name
 	//		4 Saturation
 	//		5 Color Temperature
-	// defines space for 6 characteristics, but only adds the On.
+	// defines space for 6 characteristics and adds Required ones.
 	//	custom extentions may add optonal ones 
 	class Lightbulb : public Service<6>	// reserve space for 6 characteristics
 	{
@@ -37,7 +80,7 @@ namespace Hap
 			AddCharacteristic(&_on, 0);
 		}
 
-		// access to internal characteristics
+		// access to characteristics
 		Characteristic::On& On() { return _on; }
 
 	};

@@ -6,10 +6,16 @@
 
 #include "Hap.h"
 
-static uint16_t swap_16(uint16_t v)
+class MyAccessoryInformation : public Hap::AccessoryInformation
 {
-	return ((v & 0xFF) << 8) | (v >> 8);
-}
+public:
+	MyAccessoryInformation()
+	{
+		_identify.onWrite([this](Hap::Obj::wr_prm& p, Hap::Characteristic::Identify::V v) -> void {
+			Log("MyAccessoryInformation: write Identify\n");
+		});
+	}
+};
 
 class MyLb : public Hap::Lightbulb
 {
@@ -26,13 +32,15 @@ public:
 	}
 };
 
-class MyAcc : public Hap::Accessory<1>
+class MyAcc : public Hap::Accessory<2>
 {
 private:
+	MyAccessoryInformation ai;
 	MyLb lb;
 public:
-	MyAcc() : Hap::Accessory<1>()
+	MyAcc() : Hap::Accessory<2>()
 	{
+		AddService(&ai);
 		AddService(&lb);
 	}
 };

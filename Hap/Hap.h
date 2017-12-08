@@ -139,4 +139,9 @@ namespace Hap
 	};
 }
 
+static inline uint16_t swap_16(uint16_t v)
+{
+	return ((v & 0xFF) << 8) | (v >> 8);
+}
+
 #endif
