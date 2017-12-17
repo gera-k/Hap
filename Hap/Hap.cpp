@@ -29,7 +29,7 @@ namespace Hap
 		return cnt;
 	}
 
-	bool Pairings::Add(const uint8_t* id, uint8_t id_len, const uint8_t* key, Controller::Perm perm)
+	bool Pairings::Add(const uint8_t* id, size_t id_len, const uint8_t* key, Controller::Perm perm)
 	{
 		for (int i = 0; i < sizeofarr(_db); i++)
 		{

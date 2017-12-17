@@ -134,17 +134,17 @@ namespace Hap
 
 			auto method()
 			{
-				return std::make_pair(_method, _method_len);
+				return makeBuf(_method, _method_len);
 			}
 
 			auto path()
 			{
-				return std::make_pair(_path, _path_len);
+				return makeBuf(_path, _path_len);
 			}
 
 			auto data()
 			{
-				return std::make_pair(_data, _data_len);
+				return makeBuf(_data, _data_len);
 			}
 
 			size_t hdr_count()
@@ -155,15 +155,15 @@ namespace Hap
 			auto hdr_name(size_t i)
 			{
 				if (i < _num_headers)
-					return std::make_pair(_headers[i].name, _headers[i].name_len);
-				return std::make_pair((const char *)0, (size_t)0);
+					return makeBuf(_headers[i].name, _headers[i].name_len);
+				return makeBuf((const char*&)_buf, 0);
 			}
 
 			auto hdr_value(size_t i)
 			{
 				if (i < _num_headers)
-					return std::make_pair(_headers[i].value, _headers[i].value_len);
-				return std::make_pair((const char *)0, (size_t)0);
+					return makeBuf(_headers[i].value, _headers[i].value_len);
+				return makeBuf((const char*&)_buf, 0);
 			}
 
 			// return true if header h exists, and value of integer parameter
@@ -259,6 +259,13 @@ namespace Hap
 			bool start(Status status)
 			{
 				_len = snprintf(_buf, _max, "HTTP/1.1 %s\r\n", StatusStr(status));
+				_max -= _len;
+				return _max != 0;
+			}
+
+			bool event(Status status)
+			{
+				_len = snprintf(_buf, _max, "EVENT/1.0 %s\r\n", StatusStr(status));
 				_max -= _len;
 				return _max != 0;
 			}
@@ -416,6 +423,10 @@ namespace Hap
 			} _sess[MaxHttpSessions + 1];	// last slot is for handling 'too many sessions' condition
 
 		public:
+			using Recv = std::function<int(sid_t sid, char* buf, uint16_t size)>;
+			using Send = std::function<int(sid_t sid, char* buf, uint16_t len)>;
+
+
 			Server(Db& db, Pairings& pairings, Hap::Crypt::Ed25519& keys)
 				: _db(db), _pairings(pairings), _keys(keys)
 			{}
@@ -443,24 +454,26 @@ namespace Hap
 			//			buf is send to nullptr if response buffer is too small
 			//		-	returns true after calling 'send', no matter if there was HTTP error or not
 			//		-	returns false the caller close the TCP session
-			bool Process(
-				sid_t sid,		// session ID returned from Open
-				void* ctx,		// caller context, passed back in recv and send callbacks
-				std::function<int(sid_t sid, void* ctx, char* buf, uint16_t size)> recv,
-				std::function<int(sid_t sid, void* ctx, char* buf, uint16_t len)> send
-			);
+			bool Process(sid_t sid,	Recv recv, Send send);
+
+			// Poll database (collect events)
+			//	the network task must call this periodically (once every 1..n sec)
+			//	for all opened sessions so events get delivered to all connected controllers
+			void Poll(sid_t sid, Send send);
 
 		private:
+			bool Server::_send(Session* sess, Send& send);
+			
 			void PairSetup_M1(Session* sess);
 			void PairSetup_M3(Session* sess);
 			void PairSetup_M5(Session* sess);
+			
 			void PairVerify_M1(Session* sess);
 			void PairVerify_M3(Session* sess);
+			
 			void PairingAdd(Session* sess);
 			void PairingRemove(Session* sess);
 			void PairingList(Session* sess);
-			void GetCharacteristics(Session* sess);
-			void PutCharacteristics(Session* sess);
 		};
 	}
 }

@@ -59,20 +59,15 @@ namespace Hap
 			Invalid = 0xFE
 		};
 
-		class Item : public std::pair<const uint8_t*, uint8_t>
-		{
-		public:
-			auto val() const { return first; }
-			auto len() const { return second; }
-		};
+		using Item = Buf<const uint8_t*>;
 
 		template<int MaxTlv>	// Max number of TLVs expected, parsing stops when MaxTlv is reached
 		class Parse
 		{
 		private:
 			const uint8_t* _buf;	// data buffer containing TLVs
-			uint16_t _len;			// length of the buffer
-			uint16_t _off[MaxTlv];	// offsets
+			size_t _len;			// length of the buffer
+			size_t _off[MaxTlv];	// offsets
 			uint8_t _cnt;			// number of TLVs found
 
 		public:
@@ -84,13 +79,13 @@ namespace Hap
 			}
 
 			// parse passed in buffer
-			uint8_t parse(const uint8_t* buf, uint16_t len)
+			uint8_t parse(const uint8_t* buf, size_t len)
 			{
 				_buf = (const uint8_t*)buf;
 				_len = len;
 					
 				const uint8_t* b = _buf;
-				uint16_t l = _len;
+				size_t l = _len;
 				uint8_t i;
 
 				_cnt = 0;
@@ -102,7 +97,7 @@ namespace Hap
 					_off[_cnt++] = b - _buf;
 
 					Type t = Type(b[0]);
-					uint16_t s = b[1];
+					size_t s = b[1];
 
 					Log("Tlv: type %d  length %d\n", int(t), s);
 
@@ -156,8 +151,8 @@ namespace Hap
 				{
 					if (type(i) == t)
 					{
-						item.first = value(i);
-						item.second = length(i);
+						item.ptr() = value(i);
+						item.len() = length(i);
 						return true;
 					}
 				}

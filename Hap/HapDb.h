@@ -574,10 +574,11 @@ namespace Hap
 						l = obj->getEvents(s, max, sid, aid, obj->getId());
 					else				// characteristics array
 						l = obj->getEvents(s, max, sid, aid, iid);
+					if(l > 0)
+						comma = true;
 					s += l;
 					max -= l;
 					if (max <= 0) goto Ret;
-					comma = true;
 				}
 			}
 
@@ -1432,7 +1433,7 @@ namespace Hap
 
 			if (max <= 0) goto Ret;
 
-			l = _char.getEvents(s, max, sid, aid, iid, "characteristics");
+			l = _char.getEvents(s, max, sid, aid, iid);
 			s += l;
 			max -= l;
 		Ret:
@@ -1707,19 +1708,26 @@ namespace Hap
 
 			rsp_size = 0;
 
-			*s++ = '{';
-			max--;
-			if (max <= 0)
-				return Http::HTTP_500;	// Internal error
-
-			l = _acc.getEvents(s, max, sid);
+			l = snprintf(s, max, "{\"characteristics\":[");
 			s += l;
 			max -= l;
 			if (max <= 0)
 				return Http::HTTP_500;	// Internal error
 
-			*s++ = '}';
-			max--;
+			l = _acc.getEvents(s, max, sid);
+			if (l == 0)
+			{
+				rsp_size = 0;
+				return Http::HTTP_200;
+			}
+			s += l;
+			max -= l;
+			if (max <= 0)
+				return Http::HTTP_500;	// Internal error
+
+			l = snprintf(s, max, "]}");
+			s += l;
+			max -= l;
 			if (max <= 0)
 				return Http::HTTP_500;	// Internal error
 

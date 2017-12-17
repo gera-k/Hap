@@ -29,27 +29,30 @@ public:
 
 class MyLb : public Hap::Lightbulb
 {
+private:
+	int _n;
 public:
-	MyLb()
+	MyLb(int n) : _n(n)
 	{
 		On().onRead([this](Hap::Obj::rd_prm& p) -> void {
-			Log("MyLb: read On: %d\n", On().Value());
+			Log("MyLb%d: read On: %d\n", _n, On().Value());
 		});
 
 		On().onWrite([this](Hap::Obj::wr_prm& p, Hap::Characteristic::On::V v) -> void {
-			Log("MyLb: write On: %d -> %d\n", On().Value(), v);
+			Log("MyLb%d: write On: %d -> %d\n", _n, On().Value(), v);
 		});
 	}
 
-} myLb;
+} myLb1(1), myLb2(2);
 
-class MyAcc : public Hap::Accessory<2>
+class MyAcc : public Hap::Accessory<3>
 {
 public:
-	MyAcc() : Hap::Accessory<2>()
+	MyAcc() : Hap::Accessory<3>()
 	{
 		AddService(&myAis);
-		AddService(&myLb);
+		AddService(&myLb1);
+		AddService(&myLb2);
 	}
 
 } myAcc;
@@ -116,7 +119,7 @@ int main()
 	pairings.Init();
 	keys.Init();
 
-#if 1
+#if 0
 	// start servers
 	mdns->Start();
 	tcp->Start();
@@ -132,13 +135,30 @@ int main()
 #else
 	Hap::sid_t sid = http.Open();
 
-	static char str[1024];
+	static char s[1024];
 	int l;
 
-	l = db.getDb(sid, str, sizeof(str) - 1);
-	str[l] = 0;
+	l = db.getDb(sid, s, sizeof(s) - 1);
+	s[l] = 0;
 	printf("sizeof(srv)=%d  db '%s'\n",
-		sizeof(db), str);
+		sizeof(db), s);
+
+	//static const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":2,\"value\":true,\"ev\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
+	const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":9,\"value\":true,\"ev\":true},{\"aid\":1,\"iid\":11,\"value\":true,\"ev\":true}]}";
+
+	l = sizeof(s);
+	auto rc = db.Write(sid, wr, sizeof(wr) - 1, s, l);
+	Log("Write: %s  rsp '%.*s'\n", Hap::Http::StatusStr(rc), l, s);
+
+	l = sizeof(s);
+	memset(s, 0, l);
+	rc = db.getEvents(sid, s, l);
+	Log("Events: %s  rsp %d '%.*s'\n", Hap::Http::StatusStr(rc), l, l, s);
+
+	l = sizeof(s);
+	memset(s, 0, l);
+	rc = db.getEvents(sid, s, l);
+	Log("Events: %s  rsp %d '%.*s'\n", Hap::Http::StatusStr(rc), l, l, s);
 
 	http.Close(sid);
 

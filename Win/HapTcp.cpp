@@ -42,10 +42,33 @@ namespace Hap
 						FD_SET(sd, &readfds);
 				}
 
-				int rc = select(0, &readfds, NULL, NULL, NULL);
-				if ((rc < 0) && (errno != EINTR))
+				timeval to = { 1, 0 };
+				int rc = select(0, &readfds, NULL, NULL, &to);
+				if (rc < 0)
 				{
 					Log("select error %d\n", rc);
+				}
+
+				if (rc == 0)
+				{
+					// timeout, process events
+					for (int i = 0; i < sizeofarr(client); i++)
+					{
+						SOCKET sd = client[i];
+						if (sd == 0)
+							continue;
+
+						Hap::sid_t sid = sess[i];
+						if (sid == Hap::sid_invalid)
+							continue;
+
+						_http->Poll(sid, [sd](Hap::sid_t sid, char* buf, uint16_t len) -> int
+						{
+							if (buf != nullptr)
+								return send(sd, buf, len, 0);
+							return 0;
+						});
+					}
 				}
 
 				// read event on server socket - incoming connection
@@ -96,12 +119,12 @@ namespace Hap
 						}
 						else
 						{
-							bool rc = _http->Process(sid, nullptr,
-								[sd](Hap::sid_t sid, void* ctx, char* buf, uint16_t size) -> int
+							bool rc = _http->Process(sid,
+								[sd](Hap::sid_t sid, char* buf, uint16_t size) -> int
 								{
 									return recv(sd, buf, size, 0);
 								},
-								[sd](Hap::sid_t sid, void* ctx, char* buf, uint16_t len) -> int
+								[sd](Hap::sid_t sid, char* buf, uint16_t len) -> int
 								{
 									if (buf != nullptr)
 										return send(sd, buf, len, 0);

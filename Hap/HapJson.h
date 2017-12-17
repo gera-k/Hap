@@ -86,7 +86,19 @@ namespace Hap
 					return true;
 				}
 
+				if (cmp(t, "1", JSMN_PRIMITIVE))
+				{
+					value = true;
+					return true;
+				}
+
 				if (cmp(t, "false", JSMN_PRIMITIVE))
+				{
+					value = false;
+					return true;
+				}
+
+				if (cmp(t, "0", JSMN_PRIMITIVE))
 				{
 					value = false;
 					return true;

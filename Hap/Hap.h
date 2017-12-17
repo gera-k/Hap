@@ -25,6 +25,23 @@ namespace Hap
 	constexpr uint16_t MaxHttpBlock = 1024;					// max size of encrypted block (5.5.2 Session securiry)
 	constexpr uint16_t MaxHttpFrame = MaxHttpBlock + 2 + 16;// max HTTP frame 
 
+	// generic buffer (pointer/length pair)
+	template<typename T>
+	class Buf : private std::pair<T, size_t>
+	{
+	public:
+		Buf() {}
+		Buf(T p, size_t l) : std::pair<T, size_t>(p, l) {}
+		auto ptr() const { return first; }
+		auto val() const { return first; }
+		auto len() const { return second; }
+		auto& ptr() { return first; }
+		auto& len() { return second; }
+	};
+
+	template<typename T>
+	static inline Buf<T> makeBuf(T p, size_t l) { return Buf<T>(p, l); }
+
 	namespace Bonjour
 	{
 		enum FeatureFlag
@@ -122,7 +139,7 @@ namespace Hap
 		uint8_t Count(Controller::Perm perm = Controller::None);
 
 		// add pairing record, returns false if failed
-		bool Add(const uint8_t* id, uint8_t id_len, const uint8_t* key, Controller::Perm perm);
+		bool Add(const uint8_t* id, size_t id_len, const uint8_t* key, Controller::Perm perm);
 		bool Add(const Hap::Tlv::Item& id, const Hap::Tlv::Item& key, Controller::Perm perm);
 
 		// update controller permissions

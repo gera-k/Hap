@@ -58,12 +58,7 @@ namespace Hap
 			return true;
 		}
 
-		bool Server::Process(
-			sid_t sid,
-			void* ctx,
-			std::function<int(sid_t sid, void* ctx, char* buf, uint16_t size)> recv,
-			std::function<int(sid_t sid, void* ctx, char* buf, uint16_t len)> send
-		)
+		bool Server::Process(sid_t sid, Recv recv, Send send)
 		{
 			if (sid > MaxHttpSessions)	// invalid sid
 				return false;
@@ -74,7 +69,7 @@ namespace Hap
 			if (sid == MaxHttpSessions)	// too many sessions
 			{
 				// TODO: read request, create error response
-				send(sid, ctx, sess->rsp.buf(), sess->rsp.len());
+				send(sid, sess->rsp.buf(), sess->rsp.len());
 				return false;
 			}
 
@@ -90,7 +85,7 @@ namespace Hap
 				uint16_t req_len = sizeof(sess->data) - len;
 				
 				// read next portion of the request
-				int l = recv(sid, ctx, (char*)req, req_len);
+				int l = recv(sid, (char*)req, req_len);
 				if (l < 0)	// read error
 				{
 					Log("Http: Read Error\n");
@@ -164,7 +159,7 @@ namespace Hap
 				if (status == sess->req.Error)	// parser error
 				{
 					// TODO: make response Internal server error
-					send(sid, ctx, sess->rsp.buf(), sess->rsp.len());
+					send(sid, sess->rsp.buf(), sess->rsp.len());
 					return false;
 				}
 
@@ -184,10 +179,10 @@ namespace Hap
 			}
 
 			auto m = sess->req.method();
-			Log("Method: '%.*s'\n", m.second, m.first);
+			Log("Method: '%.*s'\n", m.len(), m.ptr());
 
 			auto p = sess->req.path();
-			Log("Path: '%.*s'\n", p.second, p.first);
+			Log("Path: '%.*s'\n", p.len(), p.ptr());
 
 			auto d = sess->req.data();
 
@@ -195,10 +190,10 @@ namespace Hap
 			{
 				auto n = sess->req.hdr_name(i);
 				auto v = sess->req.hdr_value(i);
-				Log("%.*s: '%.*s'\n", n.second, n.first, v.second, v.first);
+				Log("%.*s: '%.*s'\n", n.len(), n.ptr(), v.len(), v.ptr());
 			}
 
-			if (m.second == 4 && strncmp(m.first, "POST", 4) == 0)
+			if (m.len() == 4 && strncmp(m.ptr(), "POST", 4) == 0)
 			{
 				// POST
 				//		/identify
@@ -206,7 +201,7 @@ namespace Hap
 				//		/pair-verify
 				//		/pairings
 
-				if (p.second == 9 && strncmp(p.first, "/identify", 9) == 0)
+				if (p.len() == 9 && strncmp(p.ptr(), "/identify", 9) == 0)
 				{
 					if (_pairings.Count() == 0)
 					{
@@ -222,7 +217,7 @@ namespace Hap
 						sess->rsp.end("{\"status\":-70401}");
 					}
 				}
-				else if (p.second == 11 && strncmp(p.first, "/pair-setup", 11) == 0)
+				else if (p.len() == 11 && strncmp(p.ptr(), "/pair-setup", 11) == 0)
 				{
 					int len;
 					if (!sess->req.hdr(ContentType, ContentTypeTlv8))
@@ -239,7 +234,7 @@ namespace Hap
 					}
 					else
 					{
-						sess->tlvi.parse(d.first, d.second);
+						sess->tlvi.parse(d.ptr(), d.len());
 						Log("PairSetup: TLV item count %d\n", sess->tlvi.count());
 
 						Tlv::State state;
@@ -269,7 +264,7 @@ namespace Hap
 						}
 					}
 				}
-				else if (p.second == 12 && strncmp(p.first, "/pair-verify", 12) == 0)
+				else if (p.len() == 12 && strncmp(p.ptr(), "/pair-verify", 12) == 0)
 				{
 					int len;
 					if (!sess->req.hdr(ContentType, ContentTypeTlv8))
@@ -286,7 +281,7 @@ namespace Hap
 					}
 					else
 					{
-						sess->tlvi.parse(d.first, d.second);
+						sess->tlvi.parse(d.ptr(), d.len());
 						Log("PairVerify: TLV item count %d\n", sess->tlvi.count());
 
 						Tlv::State state;
@@ -313,7 +308,7 @@ namespace Hap
 						}
 					}
 				}
-				else if (p.second == 9 && strncmp(p.first, "/pairings", 9) == 0)
+				else if (p.len() == 9 && strncmp(p.ptr(), "/pairings", 9) == 0)
 				{
 					int len;
 					if (!sess->secured)
@@ -336,7 +331,7 @@ namespace Hap
 					}
 					else
 					{
-						sess->tlvi.parse(d.first, d.second);
+						sess->tlvi.parse(d.ptr(), d.len());
 						Log("Pairings: TLV item count %d\n", sess->tlvi.count());
 
 						Tlv::State state;
@@ -391,17 +386,23 @@ namespace Hap
 				}
 				else
 				{
-					Log("Http: Unknown path %.*s\n", p.second, p.first);
+					Log("Http: Unknown path %.*s\n", p.len(), p.ptr());
 					sess->rsp.start(HTTP_400);
 					sess->rsp.end();
 				}
 			}
-			else if (m.second == 3 && strncmp(m.first, "GET", 3) == 0)
+			else if (m.len() == 3 && strncmp(m.ptr(), "GET", 3) == 0)
 			{
 				// GET
 				//		/accessories
 				//		/characteristics
-				if (p.second == 12 && strncmp(p.first, "/accessories", 12) == 0)
+				if (!sess->secured)
+				{
+					Log("Http: Authorization required\n");
+					sess->rsp.start(HTTP_470);
+					sess->rsp.end();
+				}
+				else if (p.len() == 12 && strncmp(p.ptr(), "/accessories", 12) == 0)
 				{
 					sess->rsp.start(HTTP_200);
 					sess->rsp.add(ContentType, ContentTypeJson);
@@ -414,11 +415,11 @@ namespace Hap
 
 					sess->rsp.setContentLength(len);
 				}
-				else if(strncmp(p.first, "/characteristics?", 17) == 0)
+				else if(strncmp(p.ptr(), "/characteristics?", 17) == 0)
 				{
 
 					int len = sizeof(sess->data);
-					auto status = _db.Read(sess->Sid(), p.first + 17, p.second - 17, (char*)sess->data, len);
+					auto status = _db.Read(sess->Sid(), p.ptr() + 17, p.len() - 17, (char*)sess->data, len);
 
 					Log("Read: Status %d  '%.*s'\n", status, len, sess->data);
 
@@ -435,27 +436,99 @@ namespace Hap
 				}
 				else
 				{
-					Log("Http: Unknown path %.*s\n", p.second, p.first);
+					Log("Http: Unknown path %.*s\n", p.len(), p.ptr());
 					sess->rsp.start(HTTP_400);
 					sess->rsp.end();
 				}
 			}
-			else if (m.second == 3 && strncmp(m.first, "PUT", 3) == 0)
+			else if (m.len() == 3 && strncmp(m.ptr(), "PUT", 3) == 0)
 			{
 				// PUT
 				//		/characteristics
-				if(p.second == 16 && strncmp(p.first, "/characteristics", 16) == 0)
+				if (p.len() == 16 && strncmp(p.ptr(), "/characteristics", 16) == 0)
 				{
-					PutCharacteristics(sess);
+					int len;
+					if (!sess->secured)
+					{
+						Log("Http: Authorization required\n");
+						sess->rsp.start(HTTP_470);
+						sess->rsp.end();
+					}
+					else if (!sess->req.hdr(ContentType, ContentTypeJson))
+					{
+						Log("Http: Unknown or missing ContentType\n");
+						sess->rsp.start(HTTP_400);
+						sess->rsp.end();
+					}
+					else if (!sess->req.hdr(ContentLength, len))
+					{
+						Log("Http: Unknown or missing ContentLength\n");
+						sess->rsp.start(HTTP_400);
+						sess->rsp.end();
+					}
+					else
+					{
+						Log("Http: %.*s\n", d.len(), d.ptr());
+
+						int len = sizeof(sess->data);
+						auto status = _db.Write(sess->Sid(), (const char*)d.ptr(), d.len(), (char*)sess->data, len);
+
+						Log("Write: Status %d  '%.*s'\n", status, len, sess->data);
+
+						sess->rsp.start(status);
+						if (len > 0)
+						{
+							sess->rsp.add(ContentType, ContentTypeJson);
+							sess->rsp.end((const char*)sess->data, len);
+						}
+						else
+						{
+							sess->rsp.end();
+						}
+					}
 				}
 				else
 				{
-					Log("Http: Unknown path %.*s\n", p.second, p.first);
+					Log("Http: Unknown path %.*s\n", p.len(), p.ptr());
 					sess->rsp.start(HTTP_400);
 					sess->rsp.end();
 				}
 			}
 
+			if (!_send(sess, send))
+				return false;
+
+			sess->secured = secured;
+
+			return true;
+		}
+
+		void Server::Poll(sid_t sid, Send send)
+		{
+			Session* sess = &_sess[sid];
+			if (!sess->secured)
+				return;
+
+			int len = sizeof(sess->data);
+			auto status = _db.getEvents(sid, (char*)sess->data, len);
+
+			Log("Events: Status %d  '%.*s'\n", status, len, sess->data);
+
+			if (status != Http::Status::HTTP_200)
+				return;
+
+			if (len == 0)
+				return;
+
+			sess->rsp.event(status);
+			sess->rsp.add(ContentType, ContentTypeJson);
+			sess->rsp.end((const char*)sess->data, len);
+
+			_send(sess, send);
+		}
+
+		bool Server::_send(Session* sess, Send& send)
+		{
 			if (sess->secured)
 			{
 				// session secured - encrypt data
@@ -492,18 +565,17 @@ namespace Hap
 				sess->sendSeq++;
 
 				// send encrypted block
-				send(sid, ctx, (char*)b, 2 + aad + 16);
+				send(sess->Sid(), (char*)b, 2 + aad + 16);
 			}
 			else
 			{
 				//send response as is
-				send(sid, ctx, sess->rsp.buf(), sess->rsp.len());
+				send(sess->Sid(), sess->rsp.buf(), sess->rsp.len());
 			}
-
-			sess->secured = secured;
 
 			return true;
 		}
+
 
 		void Server::PairSetup_M1(Session* sess)
 		{
@@ -1311,16 +1383,6 @@ namespace Hap
 		Ret:
 			// adjust content length in response
 			sess->rsp.setContentLength(sess->tlvo.length());
-		}
-
-		void Server::GetCharacteristics(Session* sess)
-		{
-
-		}
-
-		void Server::PutCharacteristics(Session* sess)
-		{
-
 		}
 	}
 }
