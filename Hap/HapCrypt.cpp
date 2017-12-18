@@ -143,24 +143,6 @@ namespace Hap
 		{
 
 		}
-		
-		void Ed25519::Init()		// create key pair
-		{
-			uint8_t seed[SeedSize];
-			t_random(seed, SeedSize);
-
-			ed25519_create_keypair(_pubKey, _prvKey, seed);
-		}
-
-		void Ed25519::Init(		// Init from stored key pair
-			const uint8_t *pubKey,
-			const uint8_t *prvKey
-		)
-		{
-			memcpy(_pubKey, pubKey, PubKeySize);
-			memcpy(_prvKey, prvKey, PrvKeySize);
-		}
-
 
 		void Ed25519::Sign(			// sign the message
 			uint8_t *sign,			// signature buffer, SignSize
@@ -183,5 +165,21 @@ namespace Hap
 			return rc != 0;
 		}
 
+		void Ed25519::init()		// create key pair
+		{
+			uint8_t seed[SeedSize];
+			t_random(seed, SeedSize);
+
+			ed25519_create_keypair(_pubKey, _prvKey, seed);
+		}
+
+		void Ed25519::init(		// Init from stored key pair
+			const uint8_t *pubKey,
+			const uint8_t *prvKey
+		)
+		{
+			memcpy(_pubKey, pubKey, PubKeySize);
+			memcpy(_prvKey, prvKey, PrvKeySize);
+		}
 	}
 }

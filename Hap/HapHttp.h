@@ -349,11 +349,22 @@ namespace Hap
 		//	- all access to Http Server object must be externally serialized
 		class Server
 		{
+		public:
+			struct Buf
+			{
+				Hap::Buf<char*> req;	// request buffer MaxHttpFrame*N where N depends on expected request size
+				Hap::Buf<char*> rsp;	// response buffer  MaxHttpFrame*M where M depends on expected response size
+				Hap::Buf<char*> tmp;	// temporary storage (encrypt/decrypt etc.), MaxHttpFrame
+
+
+			};
+
 		private:
 			Db& _db;						// accessory database
 			Pairings& _pairings;			// pairings database
 			Hap::Crypt::Ed25519& _keys;		// crypto keys
-			
+			Buf& _buf;
+
 			class Session					// sessions
 			{
 			public:
@@ -374,12 +385,11 @@ namespace Hap
 				
 				// session temp data
 				uint8_t key[32];
-				uint8_t data[MaxHttpFrame];
 
-				// session constructor, executed once during server object initialization
-				void Open(sid_t sid)
+				void Open(sid_t sid, Buf* buf)
 				{
 					_sid = sid;
+					_buf = buf;
 					_opened = true;
 					ios = nullptr;
 					secured = false;
@@ -400,10 +410,11 @@ namespace Hap
 					return _opened;
 				}
 
-				void Init()
+				void Init(
+				)
 				{
-					rsp.init(_rsp, sizeof(_rsp));
-					req.init(_req, sizeof(_req));
+					req.init(_buf->req.ptr(), (uint16_t)_buf->req.len());
+					rsp.init(_buf->rsp.ptr(), (uint16_t)_buf->rsp.len());
 				}
 
 				sid_t Sid()
@@ -413,13 +424,21 @@ namespace Hap
 					return sid_invalid;
 				}
 
+				uint8_t* data()
+				{
+					return (uint8_t*)_buf->tmp.ptr();
+				}
+
+				uint16_t sizeofdata()
+				{
+					return (uint16_t)_buf->tmp.len();
+				}
+
 			private:
 				// the following fields are valid from session open to close
 				bool _opened = false;		// true when session is opened
 				sid_t _sid = sid_invalid;	// valid when opened
-
-				char _req[MaxHttpFrame];	// request buffer
-				char _rsp[MaxHttpFrame];	// response buffer
+				Buf* _buf = nullptr;
 			} _sess[MaxHttpSessions + 1];	// last slot is for handling 'too many sessions' condition
 
 		public:
@@ -427,8 +446,8 @@ namespace Hap
 			using Send = std::function<int(sid_t sid, char* buf, uint16_t len)>;
 
 
-			Server(Db& db, Pairings& pairings, Hap::Crypt::Ed25519& keys)
-				: _db(db), _pairings(pairings), _keys(keys)
+			Server(Buf& buf, Db& db, Pairings& pairings, Hap::Crypt::Ed25519& keys)
+				: _buf(buf), _db(db), _pairings(pairings), _keys(keys)
 			{}
 
 			// Open - returns new session ID, 0..sid_max, or sid_invalid
@@ -452,8 +471,8 @@ namespace Hap
 			//		- processes the request and creates response
 			//		- calls 'send' to send the response back
 			//			buf is send to nullptr if response buffer is too small
-			//		-	returns true after calling 'send', no matter if there was HTTP error or not
-			//		-	returns false the caller close the TCP session
+			//		-	returns true to keep the connection open
+			//		-	returns false to close the TCP connection
 			bool Process(sid_t sid,	Recv recv, Send send);
 
 			// Poll database (collect events)
@@ -462,18 +481,18 @@ namespace Hap
 			void Poll(sid_t sid, Send send);
 
 		private:
-			bool Server::_send(Session* sess, Send& send);
+			bool _send(Session* sess, Send& send);
 			
-			void PairSetup_M1(Session* sess);
-			void PairSetup_M3(Session* sess);
-			void PairSetup_M5(Session* sess);
+			void _pairSetup1(Session* sess);
+			void _pairSetup3(Session* sess);
+			void _pairSetup5(Session* sess);
 			
-			void PairVerify_M1(Session* sess);
-			void PairVerify_M3(Session* sess);
+			void _pairVerify1(Session* sess);
+			void _pairVerify3(Session* sess);
 			
-			void PairingAdd(Session* sess);
-			void PairingRemove(Session* sess);
-			void PairingList(Session* sess);
+			void _pairingAdd(Session* sess);
+			void _pairingRemove(Session* sess);
+			void _pairingList(Session* sess);
 		};
 	}
 }

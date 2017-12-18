@@ -2,16 +2,6 @@
 
 namespace Hap
 {
-	void Pairings::Init()		// Init pairings - destroy all existing records
-	{
-		for (int i = 0; i < sizeofarr(_db); i++)
-		{
-			Controller* ios = &_db[i];
-
-			ios->perm = Controller::None;
-		}
-	}
-
 	uint8_t Pairings::Count(Controller::Perm perm)
 	{
 		uint8_t cnt = 0;
@@ -38,7 +28,8 @@ namespace Hap
 			{
 				// add new record
 				memset(rec->id, 0, Controller::IdLen);
-				memcpy(rec->id, id, id_len > Controller::IdLen ? Controller::IdLen : id_len);
+				rec->idLen = uint8_t(id_len > Controller::IdLen ? Controller::IdLen : id_len);
+				memcpy(rec->id, id, rec->idLen);
 				memcpy(rec->key, key, Controller::KeyLen);
 				rec->perm = perm;
 
@@ -146,6 +137,16 @@ namespace Hap
 		}
 
 		return true;
+	}
+
+	void Pairings::init()		// Init pairings - destroy all existing records
+	{
+		for (int i = 0; i < sizeofarr(_db); i++)
+		{
+			Controller* ios = &_db[i];
+
+			ios->perm = Controller::None;
+		}
 	}
 }
 

@@ -45,7 +45,7 @@ namespace Hap
 				"_hap._tcp",			// const char *regtype,
 				"local",				// const char *domain,
 				NULL,					// const char *host,
-				Hap::config.port,		// uint16_t port,
+				Hap::config->port,		// uint16_t port,
 				_txt_len,				// uint16_t txtLen,
 				_txt,					// const void *txtRecord,
 				[]						// DNSServiceRegisterReply callBack,

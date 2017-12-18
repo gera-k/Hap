@@ -574,11 +574,18 @@ namespace Hap
 						l = obj->getEvents(s, max, sid, aid, obj->getId());
 					else				// characteristics array
 						l = obj->getEvents(s, max, sid, aid, iid);
-					if(l > 0)
+					if (l > 0)
+					{
 						comma = true;
-					s += l;
-					max -= l;
-					if (max <= 0) goto Ret;
+						s += l;
+						max -= l;
+						if (max <= 0) goto Ret;
+					}
+					else if (comma)
+					{
+						s--;
+						max++;
+					}
 				}
 			}
 

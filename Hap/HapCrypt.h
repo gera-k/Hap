@@ -65,13 +65,6 @@ namespace Hap
 
 			Ed25519();
 
-			void Init();				// create key pair
-			
-			void Init(					// Init from stored key pair
-				const uint8_t *pubKey,
-				const uint8_t *prvKey
-			);
-
 			// return own public key
 			const uint8_t* PubKey()
 			{
@@ -91,7 +84,14 @@ namespace Hap
 				const uint8_t *pubKey	// other side public key
 			);
 		
-		private:
+		protected:
+			void init();				// create key pair
+
+			void init(					// Init from stored key pair
+				const uint8_t *pubKey,
+				const uint8_t *prvKey
+			);
+
 			uint8_t _prvKey[PrvKeySize];
 			uint8_t _pubKey[PubKeySize];
 		};

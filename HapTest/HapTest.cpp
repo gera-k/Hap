@@ -1,10 +1,26 @@
 #include <SDKDDKVer.h>
 
 #include <tchar.h>
+#include <stdio.h> 
 #include <string>
 #include <iostream>
 
 #include "Hap.h"
+
+// convert bin to hex, sizeof(s) must be >= size*2 + 1
+void bin2hex(uint8_t* buf, size_t size, char* s)
+{
+	static const char h[] = "0123456789ABCDEF";
+
+	while (size-- > 0)
+	{
+		uint8_t b = *buf++;
+
+		*s++ = h[b >> 4];
+		*s++ = h[b & 0xF];
+	}
+	*s++ = 0;
+}
 
 class MyAccessoryInformation : public Hap::AccessoryInformation
 {
@@ -18,11 +34,11 @@ public:
 
 	void config()
 	{
-		_manufacturer.Value(Hap::config.manufacturer);
-		_model.Value(Hap::config.model);
-		_name.Value(Hap::config.name);
-		_serialNumber.Value(Hap::config.serialNumber);
-		_firmwareRevision.Value(Hap::config.firmwareRevision);
+		_manufacturer.Value(Hap::config->manufacturer);
+		_model.Value(Hap::config->model);
+		_name.Value(Hap::config->name);
+		_serialNumber.Value(Hap::config->serialNumber);
+		_firmwareRevision.Value(Hap::config->firmwareRevision);
 	}
 
 } myAis;
@@ -30,10 +46,15 @@ public:
 class MyLb : public Hap::Lightbulb
 {
 private:
+	Hap::Characteristic::Name _name;
 	int _n;
 public:
-	MyLb(int n) : _n(n)
+	MyLb(Hap::Characteristic::Name::V name, int n) : _n(n)
 	{
+
+		AddName(_name);
+		_name.Value(name);
+
 		On().onRead([this](Hap::Obj::rd_prm& p) -> void {
 			Log("MyLb%d: read On: %d\n", _n, On().Value());
 		});
@@ -43,7 +64,7 @@ public:
 		});
 	}
 
-} myLb1(1), myLb2(2);
+} myLb1("Light-1", 1), myLb2("Light-2", 2);
 
 class MyAcc : public Hap::Accessory<3>
 {
@@ -75,18 +96,176 @@ public:
 		myAis.config();
 	}
 
-} myDb;
+} db;
 
-// static/global data of this accessory server
-//	data must be initialized on first time start or on reset
-//	some data must be stored in non-volatile storage and restored upon startup
-Hap::Config Hap::config;
+class MyPairings : public Hap::Pairings
+{
+public:
+	void Reset()
+	{
+		init();
+	}
 
-// static objects (take good amout of mem so don't allocate them on stack)
-MyDb db;					// accessory attribute database
-Hap::Pairings pairings;		// pairing records 
-Hap::Crypt::Ed25519 keys;	// crypto keys			
-Hap::Http::Server http(db, pairings, keys);
+	bool Restore()
+	{
+		return false;
+	}
+
+	bool Save(FILE* f)
+	{
+		if (f == NULL)
+			return false;
+
+		char* key = new char[Hap::Controller::KeyLen * 2 + 1];
+
+		bool comma = false;
+		for (int i = 0; i < sizeofarr(_db); i++)
+		{
+			Hap::Controller* ios = &_db[i];
+
+			if (ios->perm == Hap::Controller::None)
+				continue;
+
+			bin2hex(ios->key, ios->KeyLen, key);
+
+			fprintf(f, "\t\t%c{\"id\":\"%.*s\",\"key\":\"%s\",\"perm\":%d}\n", comma ? ',' :' ', ios->idLen, ios->id, key, ios->perm);
+			comma = true;
+		}
+
+		delete[] key;
+
+		return true;
+	}
+};
+
+class MyCrypto : public Hap::Crypt::Ed25519
+{
+public:
+	void Reset()
+	{
+		init();
+	}
+
+	bool Restore()
+	{
+		return false;
+	}
+
+	bool Save(FILE* f)
+	{
+		if (f == NULL)
+			return false;
+
+		char* s = new char[PrvKeySize * 2 + 1];
+
+		bin2hex(_pubKey, PubKeySize, s);
+		fprintf(f, "\t\t \"%s\"\n", s);
+
+		bin2hex(_prvKey, PrvKeySize, s);
+		fprintf(f, "\t\t,\"%s\"\n", s);
+
+		delete[] s;
+		
+		return true;
+	}
+};
+
+// configuration data of this accessory server
+//	implements save/restote to/from persistent storage 
+class MyConfig : public Hap::Config
+{
+public:
+	MyPairings pairings;
+	MyCrypto keys;
+
+	MyConfig(const char* fileName)
+		: _fileName(fileName)
+	{}
+
+	bool Exec(Action action)
+	{
+		switch (action)
+		{
+		case Restore:
+			Log("Config: restore from %s\n", _fileName);
+
+		case Reset:
+			Log("Config: reset\n");
+
+			name = "esp32test";				// const char* name;	// Accessory name - used as initial Bonjour name and as	Accessory Information Service name of aid=1
+			model = "TestModel";			// const char* model;	// Model name (Bonjour and AIS)
+			manufacturer = "TestMaker";		// Manufacturer- used by AIS (Accessory Information Service)
+			serialNumber = "0001";			// Serial number in arbitrary format
+			firmwareRevision = "0.1";		// Major[.Minor[.Revision]]
+			deviceId = "00:11:22:33:44:55";	// const char* deviceId;		// Device ID (XX:XX:XX:XX:XX:XX, generated new on factory reset)
+			configNum = 1;					// uint32_t configNum;			// Current configuration number, incremented on db change
+			categoryId = 5;					// uint8_t categoryId;			// category identifier
+			statusFlags = 0					// uint8_t statusFlags;			// status flags
+				| Hap::Bonjour::NotPaired
+				| Hap::Bonjour::NotConfiguredForWiFi;
+			setupCode = "000-11-000";		// const char* setupCode	// Setup code
+			port = swap_16(7889);			// uint16_t port;		// TCP port of HAP service
+			BCT = 0;
+
+			pairings.Reset();
+			keys.Reset();
+
+		case Save:
+		{
+			FILE* f = fopen(_fileName, "w+");
+
+			if (f == NULL)
+			{
+				Log("Config: cannot open %s for write\n", _fileName);
+				return false;
+			}
+
+			Log("Config: save to %s\n", _fileName);
+
+			fprintf(f, "{\n");
+			fprintf(f, "\t\"name\":\"%s\",\n", name);
+			fprintf(f, "\t\"model\":\"%s\",\n", model);
+			fprintf(f, "\t\"manufacturer\":\"%s\",\n", manufacturer);
+			fprintf(f, "\t\"serialNumber\":\"%s\",\n", serialNumber);
+			fprintf(f, "\t\"firmwareRevision\":\"%s\",\n", firmwareRevision);
+			fprintf(f, "\t\"deviceId\":\"%s\",\n", deviceId);
+			fprintf(f, "\t\"configNum\":%d,\n", configNum);
+			fprintf(f, "\t\"categoryId\":%d,\n", categoryId);
+			fprintf(f, "\t\"statusFlags\":%d,\n", statusFlags);
+			fprintf(f, "\t\"setupCode\":\"%s\",\n", setupCode);
+			fprintf(f, "\t\"port\":\"%d\",\n", swap_16(port));
+			fprintf(f, "\t\"keys\":[\n");
+			keys.Save(f);
+			fprintf(f, "\t],\n");
+			fprintf(f, "\t\"pairings\":[\n");
+			pairings.Save(f);
+			fprintf(f, "\t]\n");
+			fprintf(f, "}\n");
+
+			fclose(f);
+			return true;
+		}
+		}
+
+		return false;
+	}
+
+private:
+	const char* _fileName;
+};
+
+MyConfig myConfig("TestAccessory.hap");
+Hap::Config* Hap::config = &myConfig;
+
+// statically allocated storage for HTTP processing
+//	Our implementation is single-threaded so only one set of buffers.
+//	The http server uses this buffers only during processing a request.
+//	All session-persistend data is kept in Session objects.
+Hap::BufStatic<char, Hap::MaxHttpFrame * 2> http_req;
+Hap::BufStatic<char, Hap::MaxHttpFrame * 4> http_rsp;
+Hap::BufStatic<char, Hap::MaxHttpFrame * 1> http_tmp;
+Hap::Http::Server::Buf buf = { http_req, http_rsp, http_tmp };
+Hap::Http::Server http(buf, db, myConfig.pairings, myConfig.keys);
 
 int main()
 {
@@ -94,32 +273,35 @@ int main()
 	Hap::Mdns* mdns = Hap::Mdns::Create();
 	Hap::Tcp* tcp = Hap::Tcp::Create(&http);
 
-	// Init global data	TODO: save/restore to/from storage
-	Hap::config.manufacturer = "TestMaker";		// Manufacturer- used by AIS (Accessory Information Service)
-	Hap::config.name = "esp32test";				// const char* name;	// Accessory name - used as initial Bonjour name and as	Accessory Information Service name of aid=1
-	Hap::config.model = "TestModel";			// const char* model;	// Model name (Bonjour and AIS)
-	Hap::config.serialNumber = "0001";			// Serial number in arbitrary format
-	Hap::config.firmwareRevision = "0.1";		// Major[.Minor[.Revision]]
-	Hap::config.id = "00:11:22:33:44:55";		// const char* id;		// Device ID (XX:XX:XX:XX:XX:XX, generated new on factory reset)
-	Hap::config.cn = 1;							// uint32_t cn;			// Current configuration number, incremented on db change
-	Hap::config.ci = 5;							// uint8_t ci;			// category identifier
-	Hap::config.sf = 0							// uint8_t sf;			// status flags
-		| Hap::Bonjour::NotPaired
-		| Hap::Bonjour::NotConfiguredForWiFi;
-	Hap::config.setup = "000-11-000";			// const char* setup	// Setup code
-	Hap::config.port = swap_16(7889);			// uint16_t port;		// TCP port of HAP service
-	Hap::config.BCT = 0;
+	// restore configuration
+	myConfig.Exec(Hap::Config::Restore);
+	myConfig.Update = [mdns]() -> void {
 
-	Hap::config.Update = [mdns]() -> void {
-		mdns->Update();
+		bool mdnsUpdate = false;
+
+		// see if status flag must change
+		bool paired = myConfig.pairings.Count() != 0;
+		if (paired && (Hap::config->statusFlags & Hap::Bonjour::NotPaired))
+		{
+			Hap::config->statusFlags &= ~Hap::Bonjour::NotPaired;
+			mdnsUpdate = true;
+		}
+		else if (!paired && !(Hap::config->statusFlags & Hap::Bonjour::NotPaired))
+		{
+			Hap::config->statusFlags |= Hap::Bonjour::NotPaired;
+			mdnsUpdate = true;
+		}
+		
+		myConfig.Exec(Hap::Config::Save);
+
+		if (mdnsUpdate)
+			mdns->Update();
 	};
 
 	// init static objects
 	db.Init(1);
-	pairings.Init();
-	keys.Init();
 
-#if 0
+#if 1
 	// start servers
 	mdns->Start();
 	tcp->Start();
@@ -135,27 +317,27 @@ int main()
 #else
 	Hap::sid_t sid = http.Open();
 
-	static char s[1024];
-	int l;
+	static Hap::BufStatic<char, 4096> buf;
+	char* s = buf.ptr();
+	int l, len = buf.len();
 
-	l = db.getDb(sid, s, sizeof(s) - 1);
+	l = db.getDb(sid, s, len);
 	s[l] = 0;
-	printf("sizeof(srv)=%d  db '%s'\n",
-		sizeof(db), s);
+	printf("sizeof(srv)=%d  db '%s'\n", sizeof(db), s);
 
 	//static const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":2,\"value\":true,\"ev\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
 	const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":9,\"value\":true,\"ev\":true},{\"aid\":1,\"iid\":11,\"value\":true,\"ev\":true}]}";
 
-	l = sizeof(s);
+	l = len;
 	auto rc = db.Write(sid, wr, sizeof(wr) - 1, s, l);
 	Log("Write: %s  rsp '%.*s'\n", Hap::Http::StatusStr(rc), l, s);
 
-	l = sizeof(s);
+	l = len;
 	memset(s, 0, l);
 	rc = db.getEvents(sid, s, l);
 	Log("Events: %s  rsp %d '%.*s'\n", Hap::Http::StatusStr(rc), l, l, s);
 
-	l = sizeof(s);
+	l = len;
 	memset(s, 0, l);
 	rc = db.getEvents(sid, s, l);
 	Log("Events: %s  rsp %d '%.*s'\n", Hap::Http::StatusStr(rc), l, l, s);

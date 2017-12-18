@@ -67,7 +67,11 @@ namespace Hap
 	protected:
 		Characteristic::On _on;
 
-		//void AddBrightness(Characteristic::Brightness& br) { AddChar(&br, 1); }
+//		void AddBrightness(Characteristic::Brightness& ch) { AddChar(&ch, 1); }
+//		void AddHue(Characteristic::Hue& ch) { AddChar(&ch, 2); }
+		void AddName(Characteristic::Name& ch) { AddCharacteristic(&ch, 3); }
+//		void AddSaturation(Characteristic::Saturation& ch) { AddChar(&ch, 4); }
+//		void AddColorTemp(Characteristic::ColorTemp& ch) { AddChar(&ch, 5); }
 
 	public:
 		static constexpr const char* Type = "43";

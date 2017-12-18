@@ -22,7 +22,8 @@ namespace Hap
 				if (_sess[sid].isOpen())
 					continue;
 
-				_sess[sid].Open(sid);
+				// open session - use same buffers for all sessions
+				_sess[sid].Open(sid, &_buf);
 
 				// open database
 				_db.Open(sid);
@@ -66,6 +67,8 @@ namespace Hap
 			Session* sess = &_sess[sid];
 			bool secured = sess->secured;
 
+			Log("Http::Process Ses %d  secured %d  %s\n", sid, sess->secured, sess->ios ? (sess->ios->perm == Hap::Controller::Admin ? "admin" : "user") : "?");
+
 			if (sid == MaxHttpSessions)	// too many sessions
 			{
 				// TODO: read request, create error response
@@ -81,8 +84,8 @@ namespace Hap
 			uint16_t http_len;		// length of http request
 			while (true)
 			{
-				uint8_t* req = sess->data + len;
-				uint16_t req_len = sizeof(sess->data) - len;
+				uint8_t* req = sess->data() + len;
+				uint16_t req_len = sess->sizeofdata() - len;
 				
 				// read next portion of the request
 				int l = recv(sid, (char*)req, req_len);
@@ -107,7 +110,7 @@ namespace Hap
 					if (len < 2)	// wait fot at least two bytes of data length 
 						continue;
 					
-					uint8_t *p = sess->data;
+					uint8_t *p = sess->data();
 					uint16_t aad = p[0] + ((uint16_t)(p[1]) << 8);	// data length, also serves as AAD for decryption
 
 					if (aad > MaxHttpBlock)
@@ -149,7 +152,7 @@ namespace Hap
 				else
 				{
 					// otherwise copy received data into request buffer as is
-					memcpy(sess->req.buf(), sess->data, len);
+					memcpy(sess->req.buf(), sess->data(), len);
 
 					http_len = len;
 				}
@@ -247,15 +250,15 @@ namespace Hap
 							switch (state)
 							{
 							case Tlv::State::M1:
-								PairSetup_M1(sess);
+								_pairSetup1(sess);
 								break;
 
 							case Tlv::State::M3:
-								PairSetup_M3(sess);
+								_pairSetup3(sess);
 								break;
 
 							case Tlv::State::M5:
-								PairSetup_M5(sess);
+								_pairSetup5(sess);
 								break;
 
 							default:
@@ -294,11 +297,11 @@ namespace Hap
 							switch (state)
 							{
 							case Tlv::State::M1:
-								PairVerify_M1(sess);
+								_pairVerify1(sess);
 								break;
 
 							case Tlv::State::M3:
-								PairVerify_M3(sess);
+								_pairVerify3(sess);
 								secured = sess->ios != nullptr;
 								break;
 
@@ -363,15 +366,15 @@ namespace Hap
 									switch (method)
 									{
 									case Tlv::Method::AddPairing:
-										PairingAdd(sess);
+										_pairingAdd(sess);
 										break;
 
 									case Tlv::Method::RemovePairing:
-										PairingRemove(sess);
+										_pairingRemove(sess);
 										break;
 
 									case Tlv::Method::ListPairing:
-										PairingList(sess);
+										_pairingList(sess);
 										break;
 
 									default:
@@ -418,16 +421,16 @@ namespace Hap
 				else if(strncmp(p.ptr(), "/characteristics?", 17) == 0)
 				{
 
-					int len = sizeof(sess->data);
-					auto status = _db.Read(sess->Sid(), p.ptr() + 17, p.len() - 17, (char*)sess->data, len);
+					int len = sess->sizeofdata();
+					auto status = _db.Read(sess->Sid(), p.ptr() + 17, p.len() - 17, (char*)sess->data(), len);
 
-					Log("Read: Status %d  '%.*s'\n", status, len, sess->data);
+					Log("Read: Status %d  '%.*s'\n", status, len, sess->data());
 
 					sess->rsp.start(status);
 					if (len > 0)
 					{
 						sess->rsp.add(ContentType, ContentTypeJson);
-						sess->rsp.end((const char*)sess->data, len);
+						sess->rsp.end((const char*)sess->data(), len);
 					}
 					else
 					{
@@ -470,16 +473,16 @@ namespace Hap
 					{
 						Log("Http: %.*s\n", d.len(), d.ptr());
 
-						int len = sizeof(sess->data);
-						auto status = _db.Write(sess->Sid(), (const char*)d.ptr(), d.len(), (char*)sess->data, len);
+						int len = sess->sizeofdata();
+						auto status = _db.Write(sess->Sid(), (const char*)d.ptr(), d.len(), (char*)sess->data(), len);
 
-						Log("Write: Status %d  '%.*s'\n", status, len, sess->data);
+						Log("Write: Status %d  '%.*s'\n", status, len, sess->data());
 
 						sess->rsp.start(status);
 						if (len > 0)
 						{
 							sess->rsp.add(ContentType, ContentTypeJson);
-							sess->rsp.end((const char*)sess->data, len);
+							sess->rsp.end((const char*)sess->data(), len);
 						}
 						else
 						{
@@ -499,6 +502,7 @@ namespace Hap
 				return false;
 
 			sess->secured = secured;
+			Log("Http::Process exit Ses %d  secured %d\n", sid, sess->secured);
 
 			return true;
 		}
@@ -509,10 +513,8 @@ namespace Hap
 			if (!sess->secured)
 				return;
 
-			int len = sizeof(sess->data);
-			auto status = _db.getEvents(sid, (char*)sess->data, len);
-
-			Log("Events: Status %d  '%.*s'\n", status, len, sess->data);
+			int len = sess->sizeofdata();
+			auto status = _db.getEvents(sid, (char*)sess->data(), len);
 
 			if (status != Http::Status::HTTP_200)
 				return;
@@ -520,9 +522,11 @@ namespace Hap
 			if (len == 0)
 				return;
 
+			Log("Events: sid %d  '%.*s'\n", sid, len, sess->data());
+
 			sess->rsp.event(status);
 			sess->rsp.add(ContentType, ContentTypeJson);
-			sess->rsp.end((const char*)sess->data, len);
+			sess->rsp.end((const char*)sess->data(), len);
 
 			_send(sess, send);
 		}
@@ -533,39 +537,43 @@ namespace Hap
 			{
 				// session secured - encrypt data
 				const uint8_t *p = (uint8_t*)sess->rsp.buf();
-				uint16_t aad = sess->rsp.len();				// data length, and AAD for encryption
-
-				if (aad > MaxHttpBlock)
+				uint16_t len = sess->rsp.len();				// data length
+				
+				while (len > 0)
 				{
-					Log("Http: response size is too big: %d\n", aad);
-					return false;
+					uint16_t aad = len;		// block length, and AAD for encryption
+
+					if (aad > MaxHttpBlock)
+						aad = MaxHttpBlock;
+
+					// make 96-bit nonce from send sequential number
+					uint8_t nonce[12];
+					memset(nonce, 0, sizeof(nonce));
+					memcpy(nonce + 4, &sess->sendSeq, 8);
+
+					// encrypt into sess->data buffer which must be >= MaxHttpFrame
+					uint8_t* b = sess->data();
+
+					// copy data length into output buffer
+					b[0] = aad & 0xFF;
+					b[1] = (aad >> 8) & 0xFF;
+
+					Hap::Crypt::aead(Hap::Crypt::Encrypt,
+						b + 2, b + 2 + aad,					// output data and tag positions
+						sess->AccessoryToControllerKey,		// encryption key
+						nonce,
+						p, aad,								// data to encrypt
+						b, 2								// aad
+					);
+
+					sess->sendSeq++;
+
+					// send encrypted block
+					send(sess->Sid(), (char*)b, 2 + aad + 16);
+
+					len -= aad;
+					p += aad;
 				}
-
-				// make 96-bit nonce from send sequential number
-				uint8_t nonce[12];
-				memset(nonce, 0, sizeof(nonce));
-				memcpy(nonce + 4, &sess->sendSeq, 8);
-
-				// encrypt into sess->data buffer
-				uint8_t* b = sess->data;
-				memset(b, 0, sizeof(sess->data));
-
-				// copy data length into output buffer
-				b[0] = aad & 0xFF;
-				b[1] = (aad >> 8) & 0xFF;
-
-				Hap::Crypt::aead(Hap::Crypt::Encrypt,
-					b + 2, b + 2 + aad,					// output data and tag positions
-					sess->AccessoryToControllerKey,		// encryption key
-					nonce,
-					p, aad,								// data to encrypt
-					b, 2								// aad
-				);
-
-				sess->sendSeq++;
-
-				// send encrypted block
-				send(sess->Sid(), (char*)b, 2 + aad + 16);
 			}
 			else
 			{
@@ -577,7 +585,7 @@ namespace Hap
 		}
 
 
-		void Server::PairSetup_M1(Session* sess)
+		void Server::_pairSetup1(Session* sess)
 		{
 			int rc;
 			cstr* pub = NULL;
@@ -668,14 +676,14 @@ namespace Hap
 			Hex("Generator", srp_generator, sizeof_srp_generator);
 			Hex("Salt", salt, sizeof(salt));
 
-			rc = SRP_set_auth_password(srp, Hap::config.setup);
+			rc = SRP_set_auth_password(srp, Hap::config->setupCode);
 			if (rc != SRP_SUCCESS)
 			{
 				Log("PairSetupM1: SRP_set_auth_password error %d\n", rc);
 				goto RetErr;
 			}
 
-			Hex("Username", Hap::config.setup, strlen(Hap::config.setup));
+			Hex("Username", Hap::config->setupCode, strlen(Hap::config->setupCode));
 
 			rc = SRP_gen_pub(srp, &pub);
 			if (rc != SRP_SUCCESS)
@@ -706,12 +714,12 @@ namespace Hap
 			sess->rsp.setContentLength(sess->tlvo.length());
 		}
 	
-		void Server::PairSetup_M3(Session* sess)
+		void Server::_pairSetup3(Session* sess)
 		{
 			int rc;
 			uint16_t size;
-			uint8_t* iosKey = sess->data;
-			uint8_t* iosProof = sess->data + 384;
+			uint8_t* iosKey = sess->data();
+			uint8_t* iosProof = iosKey + 384;
 			uint16_t iosKey_size = 384;
 			uint16_t iosProof_size = 64;
 			cstr* key = NULL;
@@ -812,7 +820,7 @@ namespace Hap
 			sess->rsp.setContentLength(sess->tlvo.length());
 		}
 
-		void Server::PairSetup_M5(Session* sess)
+		void Server::_pairSetup5(Session* sess)
 		{
 			uint8_t* iosEncrypted;	// encrypted tata from iOS with tag attached
 			uint8_t* iosTag;		// pointer to iOS tag
@@ -840,8 +848,8 @@ namespace Hap
 			}
 
 			// extract encrypted data into sess->data buffer
-			iosEncrypted = sess->data;
-			iosTlv_size = sizeof(sess->data);
+			iosEncrypted = sess->data();
+			iosTlv_size = sess->sizeofdata();
 			if (!sess->tlvi.get(Tlv::Type::EncryptedData, iosEncrypted, iosTlv_size))
 			{
 				Log("PairSetupM5: EncryptedData not found\n");
@@ -913,9 +921,9 @@ namespace Hap
 				}
 
 				// buid Accessory Info and sign it
-				uint8_t* AccesoryInfo = sess->data;	// re-use sess->data buffer
+				uint8_t* AccesoryInfo = sess->data();	// re-use sess->data buffer
 				uint8_t* p = AccesoryInfo;
-				int l = sizeof(sess->data);
+				int l = sess->sizeofdata();
 
 				// add AccessoryX
 				Hap::Crypt::hkdf(
@@ -927,9 +935,9 @@ namespace Hap
 				l -= 32;
 				
 				// add Accessory PairingId
-				memcpy(p, config.id, strlen(config.id));
-				p += strlen(config.id);
-				l -= strlen(config.id);
+				memcpy(p, config->deviceId, strlen(config->deviceId));
+				p += strlen(config->deviceId);
+				l -= strlen(config->deviceId);
 
 				// add Accessory LTPK
 				memcpy(p, _keys.PubKey(), _keys.PubKeySize);
@@ -944,7 +952,7 @@ namespace Hap
 				// construct the sub-TLV
 				Hap::Tlv::Create subTlv;
 				subTlv.create(p, l);
-				subTlv.add(Hap::Tlv::Type::Identifier, (const uint8_t*)config.id, (uint16_t)strlen(config.id));
+				subTlv.add(Hap::Tlv::Type::Identifier, (const uint8_t*)config->deviceId, (uint16_t)strlen(config->deviceId));
 				subTlv.add(Hap::Tlv::Type::PublicKey, _keys.PubKey(), _keys.PubKeySize);
 				subTlv.add(Hap::Tlv::Type::Signature, p - _keys.SignSize, _keys.SignSize);
 				p += subTlv.length();
@@ -966,8 +974,7 @@ namespace Hap
 				// add encryped info and tag to output TLV
 				sess->tlvo.add(Hap::Tlv::Type::EncryptedData, p, subTlv.length() + 16);
 
-				Hap::config.sf &= ~Hap::Bonjour::NotPaired;
-				Hap::config.Update();
+				Hap::config->Update();
 
 				goto RetDone;	// pairing complete
 			}
@@ -988,7 +995,7 @@ namespace Hap
 			sess->rsp.setContentLength(sess->tlvo.length());
 		}
 
-		void Server::PairVerify_M1(Session* sess)
+		void Server::_pairVerify1(Session* sess)
 		{
 			Hap::Tlv::Item iosKey;
 			const uint8_t* sharedSecret;
@@ -1028,8 +1035,8 @@ namespace Hap
 				sess->key, sizeof(sess->key));
 
 			// construct AccessoryInfo
-			p = sess->data;
-			l = sizeof(sess->data);
+			p = sess->data();
+			l = sess->sizeofdata();
 
 			//	add Curve25519 public key
 			memcpy(p, sess->curve.getPublicKey(), sess->curve.KeySize);
@@ -1037,9 +1044,9 @@ namespace Hap
 			l -= sess->curve.KeySize;
 
 			//	add Accessory PairingId
-			memcpy(p, config.id, strlen(config.id));
-			p += strlen(config.id);
-			l -= strlen(config.id);
+			memcpy(p, config->deviceId, strlen(config->deviceId));
+			p += strlen(config->deviceId);
+			l -= strlen(config->deviceId);
 
 			// add iOS device public key
 			memcpy(p, iosKey.val(), iosKey.len());
@@ -1047,14 +1054,14 @@ namespace Hap
 			l -= iosKey.len();
 
 			// sign the AccessoryInfo
-			_keys.Sign(p, sess->data, p - sess->data);
+			_keys.Sign(p, sess->data(), p - sess->data());
 			p += _keys.SignSize;
 			l -= _keys.SignSize;
 
 			// make sub-TLV
 			Hap::Tlv::Create subTlv;
 			subTlv.create(p, l);
-			subTlv.add(Hap::Tlv::Type::Identifier, (const uint8_t*)config.id, (uint16_t)strlen(config.id));
+			subTlv.add(Hap::Tlv::Type::Identifier, (const uint8_t*)config->deviceId, (uint16_t)strlen(config->deviceId));
 			subTlv.add(Hap::Tlv::Type::Signature, p - _keys.SignSize, _keys.SignSize);
 			p += subTlv.length();
 			l -= subTlv.length();
@@ -1088,7 +1095,7 @@ namespace Hap
 			sess->rsp.setContentLength(sess->tlvo.length());
 		}
 
-		void Server::PairVerify_M3(Session* sess)
+		void Server::_pairVerify3(Session* sess)
 		{
 			uint8_t* iosEncrypted;	// encrypted tata from iOS with tag attached
 			uint8_t* iosTag;		// pointer to iOS tag
@@ -1109,8 +1116,8 @@ namespace Hap
 			sess->tlvo.add(Hap::Tlv::Type::State, Hap::Tlv::State::M4);
 
 			// extract encrypted data into sess->data buffer
-			iosEncrypted = sess->data;
-			iosTlv_size = sizeof(sess->data);
+			iosEncrypted = sess->data();
+			iosTlv_size = sess->sizeofdata();
 			if (!sess->tlvi.get(Tlv::Type::EncryptedData, iosEncrypted, iosTlv_size))
 			{
 				Log("PairVerifyM3: EncryptedData not found\n");
@@ -1201,7 +1208,7 @@ namespace Hap
 			sess->rsp.setContentLength(sess->tlvo.length());
 		}
 
-		void Server::PairingAdd(Session* sess)
+		void Server::_pairingAdd(Session* sess)
 		{
 			Tlv::Item id;
 			Tlv::Item key;
@@ -1248,7 +1255,7 @@ namespace Hap
 				Log("PairingAdd: Permissions not found\n");
 				goto RetErr;
 			}
-			Log("PairingAdd: Permissions 0x%X", perm);
+			Log("PairingAdd: Permissions 0x%X\n", perm);
 
 			// locate new controller in pairing db
 			ios = _pairings.Get(id);
@@ -1270,6 +1277,8 @@ namespace Hap
 				goto Ret;
 			}
 
+			Hap::config->Update();
+
 			goto Ret;
 
 		RetErr:	// error
@@ -1280,7 +1289,7 @@ namespace Hap
 			sess->rsp.setContentLength(sess->tlvo.length());
 		}
 
-		void Server::PairingRemove(Session* sess)
+		void Server::_pairingRemove(Session* sess)
 		{
 			Tlv::Item id;
 
@@ -1318,6 +1327,8 @@ namespace Hap
 				goto RetErr;
 			}
 
+			Hap::config->Update();
+
 			// TODO: close all sessions to removed controller
 
 			goto Ret;
@@ -1330,7 +1341,7 @@ namespace Hap
 			sess->rsp.setContentLength(sess->tlvo.length());
 		}
 
-		void Server::PairingList(Session* sess)
+		void Server::_pairingList(Session* sess)
 		{
 			Log("PairingList\n");
 
@@ -1353,7 +1364,7 @@ namespace Hap
 			}
 
 			bool first = true;
-			bool rc = _pairings.forEach([sess, first](const Controller* ios) -> bool {
+			bool rc = _pairings.forEach([sess, &first](const Controller* ios) -> bool {
 
 				if (!first)
 				{
@@ -1369,6 +1380,8 @@ namespace Hap
 
 				if (!sess->tlvo.add(Hap::Tlv::Type::Permissions, ios->perm))
 					return false;
+
+				first = false;
 
 				return true;
 			});

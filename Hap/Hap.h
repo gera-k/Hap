@@ -37,6 +37,17 @@ namespace Hap
 		auto len() const { return second; }
 		auto& ptr() { return first; }
 		auto& len() { return second; }
+
+		T& operator[](int i) { return first[i]; }
+	};
+
+	template<typename T, size_t S>
+	class BufStatic : public Buf<T*>
+	{
+	private:
+		T _buf[S];
+	public:
+		BufStatic() : Buf(_buf, S) {}
 	};
 
 	template<typename T>
@@ -57,28 +68,34 @@ namespace Hap
 		};
 	}
 
-	struct Config
+	class Config
 	{
-		const char* manufacturer;		// Manufacturer- used by AIS (Accessory Information Service)
+	public:
 		const char* name;				// Accessory name - used as initial Bonjour name and as AIS name of aid=1
 		const char* model;				// Model name (Bonjour and AIS)
+		const char* manufacturer;		// Manufacturer- used by AIS (Accessory Information Service)
 		const char* serialNumber;		// Serial number in arbitrary format
 		const char* firmwareRevision;	// Major[.Minor[.Revision]]
-		const char* id;					// Device ID (XX:XX:XX:XX:XX:XX, new id generated on each factory reset)
-		uint32_t cn;					// Current configuration number, incremented on db change
-		uint8_t ci;						// category identifier
-		uint8_t sf;						// status flags
+		const char* deviceId;			// Device ID (XX:XX:XX:XX:XX:XX, new deviceId generated on each factory reset)
+		uint32_t configNum;				// Current configuration number, incremented on db change
+		uint8_t categoryId;				// category identifier
+		uint8_t statusFlags;			// status flags
 
-		const char* setup;				// setup code XXX-XX-XXX
-
+		const char* setupCode;			// setupCode code XXX-XX-XXX
 		uint16_t port;					// TCP port of HAP service in net byte order
-
 		bool BCT;						// Bonjour Compatibility Test
 
 		std::function<void()> Update;	// config update notification
+
+		enum Action
+		{
+			Reset,		// factory reset
+			Save,		// save to persistent storage
+			Restore,	// restore from persistent storage
+		};
 	};
 
-	extern Config config;
+	extern Config* config;
 
 	// HAP session ID
 	//	some DB characteristics and methods depend on HAP session context
@@ -104,6 +121,7 @@ namespace Hap
 		};
 
 		Perm perm;
+		uint8_t idLen;
 		Id id;
 		Key key;
 	};
@@ -130,10 +148,6 @@ namespace Hap
 	class Pairings
 	{
 	public:
-	
-		// Init pairings - destroy all existing records
-		void Init();
-
 		// count pairing records with matching Permissions
 		//	in perm == None, cput all records
 		uint8_t Count(Controller::Perm perm = Controller::None);
@@ -153,7 +167,10 @@ namespace Hap
 
 		bool Pairings::forEach(std::function<bool(const Controller*)> cb);
 
-	private:
+	protected:
+		// Init pairings - destroy all existing records
+		void init();
+
 		Controller _db[MaxPairings];
 	};
 }
