@@ -56,8 +56,9 @@ namespace Hap
 			};
 			return str[int(h)];
 		}
-		static const char* ContentTypeJson = "application/hap+json";
-		static const char* ContentTypeTlv8 = "application/pairing+tlv8";
+
+		extern const char* ContentTypeJson;
+		extern const char* ContentTypeTlv8;
 
 		// Http request parser
 		template<int MaxHeaders>
@@ -204,7 +205,7 @@ namespace Hap
 					if (strlen(s) == _headers[i].name_len &&
 						memcmp(_headers[i].name, s, _headers[i].name_len) == 0)
 					{
-						int l = strlen(prm);
+						unsigned l = strlen(prm);
 						return l == _headers[i].value_len &&
 							memcmp(prm, _headers[i].value, l) == 0;
 					}
@@ -360,10 +361,10 @@ namespace Hap
 			};
 
 		private:
+			Buf& _buf;
 			Db& _db;						// accessory database
 			Pairings& _pairings;			// pairings database
 			Hap::Crypt::Ed25519& _keys;		// crypto keys
-			Buf& _buf;
 
 			class Session					// sessions
 			{

@@ -15,7 +15,7 @@ namespace Hap
 			uint8_t type;		// expected type mask, may include JSMN_UNDEFINED if key is optional
 
 			// parse results:
-			int i = -1;			// i>0 - key is present, i = index of value; i<=0 - key not present
+			int i;				// i>0 - key is present, i = index of value; i<=0 - key not present
 		};
 
 		class Obj

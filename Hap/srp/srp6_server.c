@@ -102,7 +102,7 @@ srp6_server_params(SRP * srp, const unsigned char * modulus, int modlen,
 {
   unsigned char buf1[SHA_DIGESTSIZE], buf2[SHA_DIGESTSIZE];
   SHACTX ctxt;
-  int i;
+  unsigned i;
 
   /* Fields set by SRP_set_params */
 

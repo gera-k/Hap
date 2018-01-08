@@ -380,6 +380,8 @@ namespace Hap
 		// parsed parameters of PUT/characteristics request
 		struct wr_prm
 		{
+			wr_prm(Hap::Json::Obj& rq_) : rq(rq_) {}
+
 			Hap::Json::Obj& rq;			// request object
 
 			iid_t aid = null_id;
@@ -823,7 +825,7 @@ namespace Hap
 
 			void SetEvent(bool e = true)
 			{
-				for (int i = 0; i < sizeofarr(_e); i++)
+				for (unsigned i = 0; i < sizeofarr(_e); i++)
 					if (_v[i])
 						_e[i] = true;
 			}

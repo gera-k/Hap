@@ -5,7 +5,7 @@ namespace Hap
 	uint8_t Pairings::Count(Controller::Perm perm)
 	{
 		uint8_t cnt = 0;
-		for (int i = 0; i < sizeofarr(_db); i++)
+		for (unsigned i = 0; i < sizeofarr(_db); i++)
 		{
 			Controller* ios = &_db[i];
 
@@ -21,7 +21,7 @@ namespace Hap
 
 	bool Pairings::Add(const uint8_t* id, size_t id_len, const uint8_t* key, Controller::Perm perm)
 	{
-		for (int i = 0; i < sizeofarr(_db); i++)
+		for (unsigned i = 0; i < sizeofarr(_db); i++)
 		{
 			Controller* rec = &_db[i];
 			if (rec->perm == Controller::None)
@@ -68,7 +68,7 @@ namespace Hap
 		if (id.len() > Controller::IdLen)
 			return false;
 
-		for (int i = 0; i < sizeofarr(_db); i++)
+		for (unsigned i = 0; i < sizeofarr(_db); i++)
 		{
 			Controller* ios = &_db[i];
 
@@ -90,7 +90,7 @@ namespace Hap
 		if (id.len() > Controller::IdLen)
 			return false;
 
-		for (int i = 0; i < sizeofarr(_db); i++)
+		for (unsigned i = 0; i < sizeofarr(_db); i++)
 		{
 			Controller* ios = &_db[i];
 
@@ -109,7 +109,7 @@ namespace Hap
 		if (id.len() > Controller::IdLen)
 			return nullptr;
 
-		for (int i = 0; i < sizeofarr(_db); i++)
+		for (unsigned i = 0; i < sizeofarr(_db); i++)
 		{
 			Controller* ios = &_db[i];
 
@@ -125,7 +125,7 @@ namespace Hap
 
 	bool Pairings::forEach(std::function<bool(const Controller*)> cb)
 	{
-		for (int i = 0; i < sizeofarr(_db); i++)
+		for (unsigned i = 0; i < sizeofarr(_db); i++)
 		{
 			Controller* ios = &_db[i];
 
@@ -141,7 +141,7 @@ namespace Hap
 
 	void Pairings::init()		// Init pairings - destroy all existing records
 	{
-		for (int i = 0; i < sizeofarr(_db); i++)
+		for (unsigned i = 0; i < sizeofarr(_db); i++)
 		{
 			Controller* ios = &_db[i];
 
@@ -193,7 +193,7 @@ void Hex(const char* Header, const void* Buffer, size_t Length)
 			else *p++ = a[i];
 		}
 
-		Log("0x%04lX:%s\n", (uintptr_t)a & 0xFFFF, line);
+		Log("0x%04lX:%s\n", (unsigned long)a & 0xFFFF, line);
 
 		Length -= max;
 		a += max;

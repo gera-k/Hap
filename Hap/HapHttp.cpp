@@ -1,12 +1,16 @@
 #include "Hap.h"
 
 
-#include "srp\srp.h"
+#include "srp/srp.h"
 
 namespace Hap
 {
 	namespace Http
 	{
+
+		const char* ContentTypeJson = "application/hap+json";
+		const char* ContentTypeTlv8 = "application/pairing+tlv8";
+
 		// current pairing session - only one simultaneous pairing is allowed
 		SRP* srp = NULL;					// !NULL = pairing in progress, only one pairing at a time
 		uint8_t srp_shared_secret[64];		// SRP shared secret
@@ -1343,6 +1347,9 @@ namespace Hap
 
 		void Server::_pairingList(Session* sess)
 		{
+			bool first = true;
+			bool rc;
+
 			Log("PairingList\n");
 
 			// prepare response without data
@@ -1363,8 +1370,7 @@ namespace Hap
 				goto Ret;
 			}
 
-			bool first = true;
-			bool rc = _pairings.forEach([sess, &first](const Controller* ios) -> bool {
+			rc = _pairings.forEach([sess, &first](const Controller* ios) -> bool {
 
 				if (!first)
 				{

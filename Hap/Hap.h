@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdint.h>
 
+#include <utility>
 #include <functional>
 
 extern "C" void t_random(unsigned char* data, unsigned size);
@@ -27,18 +28,19 @@ namespace Hap
 
 	// generic buffer (pointer/length pair)
 	template<typename T>
-	class Buf : private std::pair<T, size_t>
+	class Buf : protected std::pair<T, size_t>
 	{
 	public:
+		using B = std::pair<T, size_t>;
 		Buf() {}
 		Buf(T p, size_t l) : std::pair<T, size_t>(p, l) {}
-		auto ptr() const { return first; }
-		auto val() const { return first; }
-		auto len() const { return second; }
-		auto& ptr() { return first; }
-		auto& len() { return second; }
+		auto ptr() const { return B::first; }
+		auto val() const { return B::first; }
+		auto len() const { return B::second; }
+		auto& ptr() { return B::first; }
+		auto& len() { return B::second; }
 
-		T& operator[](int i) { return first[i]; }
+		T& operator[](int i) { return B::first[i]; }
 	};
 
 	template<typename T, size_t S>
@@ -47,7 +49,7 @@ namespace Hap
 	private:
 		T _buf[S];
 	public:
-		BufStatic() : Buf(_buf, S) {}
+		BufStatic() : Buf<T*>(_buf, S) {}
 	};
 
 	template<typename T>
@@ -165,7 +167,7 @@ namespace Hap
 		// get pairing record, returns nullptr if not found
 		const Controller* Get(const Hap::Tlv::Item& id);
 
-		bool Pairings::forEach(std::function<bool(const Controller*)> cb);
+		bool forEach(std::function<bool(const Controller*)> cb);
 
 	protected:
 		// Init pairings - destroy all existing records
