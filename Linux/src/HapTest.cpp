@@ -175,7 +175,7 @@ public:
 };
 
 // configuration data of this accessory server
-//	implements save/restote to/from persistent storage
+//	implements save/restore to/from persistent storage
 class MyConfig : public Hap::Config
 {
 public:
@@ -192,11 +192,12 @@ public:
 		{
 		case Restore:
 			Log("Config: restore from %s\n", _fileName);
+			// TODO: implement restore
 
 		case Reset:
 			Log("Config: reset\n");
 
-			name = "esp32test";				// const char* name;	// Accessory name - used as initial Bonjour name and as	Accessory Information Service name of aid=1
+			name = "HapLinux";				// const char* name;	// Accessory name - used as initial Bonjour name and as	Accessory Information Service name of aid=1
 			model = "TestModel";			// const char* model;	// Model name (Bonjour and AIS)
 			manufacturer = "TestMaker";		// Manufacturer- used by AIS (Accessory Information Service)
 			serialNumber = "0001";			// Serial number in arbitrary format
@@ -264,7 +265,7 @@ Hap::Config* Hap::config = &myConfig;
 // statically allocated storage for HTTP processing
 //	Our implementation is single-threaded so only one set of buffers.
 //	The http server uses this buffers only during processing a request.
-//	All session-persistend data is kept in Session objects.
+//	All session-persistent data is kept in Session objects.
 Hap::BufStatic<char, Hap::MaxHttpFrame * 2> http_req;
 Hap::BufStatic<char, Hap::MaxHttpFrame * 4> http_rsp;
 Hap::BufStatic<char, Hap::MaxHttpFrame * 1> http_tmp;
@@ -272,7 +273,7 @@ Hap::Http::Server::Buf buf = { http_req, http_rsp, http_tmp };
 Hap::Http::Server http(buf, db, myConfig.pairings, myConfig.keys);
 
 
-#define NOSRV
+//#define NOSRV
 
 int main()
 {

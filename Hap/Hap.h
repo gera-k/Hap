@@ -13,6 +13,8 @@
 extern "C" void t_random(unsigned char* data, unsigned size);
 
 #define Log printf
+//#define Dbg printf
+#define Dbg(...)
 void Hex(const char* Header, const void* Buffer, size_t Length);
 
 namespace Hap
