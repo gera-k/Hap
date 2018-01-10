@@ -8,7 +8,7 @@
 
 namespace Hap
 {
-	class MdnsWin : public Mdns
+	class MdnsImpl : public Mdns
 	{
 	private:
 		std::thread task;
@@ -31,7 +31,7 @@ namespace Hap
 
 		void run()
 		{
-			Log("MdnsWin::Run - enter\n");
+			Log("MdnsImpl::Run - enter\n");
 
 			update();
 
@@ -59,7 +59,7 @@ namespace Hap
 				void *context
 				) -> void
 				{
-					((MdnsWin*)context)->callback(sdRef, flags, errorCode, name, regtype, domain);
+					((MdnsImpl*)context)->callback(sdRef, flags, errorCode, name, regtype, domain);
 				},
 				this					//void *context
 			);
@@ -83,11 +83,11 @@ namespace Hap
 			}
 			client = NULL;
 
-			Log("MdnsWin::Run - exit\n");
+			Log("MdnsImpl::Run - exit\n");
 		}
 
 	public:
-		~MdnsWin()
+		~MdnsImpl()
 		{
 			Stop();
 		}
@@ -95,7 +95,7 @@ namespace Hap
 		virtual void Start() override
 		{
 			running = true;
-			task = std::thread(&MdnsWin::run, this);
+			task = std::thread(&MdnsImpl::run, this);
 		}
 
 		virtual void Stop() override
@@ -135,10 +135,10 @@ namespace Hap
 				Log("MDNS Service '%s' updated\n", _name);
 			}
 		}
-	} mdnsWin;
+	} mdns;
 
 	Mdns* Mdns::Create()
 	{
-		return &mdnsWin;
+		return &mdns;
 	}
 }

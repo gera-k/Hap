@@ -11,7 +11,7 @@
 
 namespace Hap
 {
-	class TcpWin : public Tcp
+	class TcpImpl : public Tcp
 	{
 	private:
 		std::thread task;
@@ -23,7 +23,7 @@ namespace Hap
 
 		void run()
 		{
-			Log("TcpWin::Run - enter\n");
+			Log("TcpImpl::Run - enter\n");
 
 			struct sockaddr_in address;
 			int addrlen = sizeof(address);
@@ -193,17 +193,17 @@ namespace Hap
 				}
 			}
 
-			Log("TcpWin::Run - exit\n");
+			Log("TcpImpl::Run - exit\n");
 		}
 
 	public:
-		TcpWin()
+		TcpImpl()
 		{
 			WSADATA wsaData = { 0 };
 			WSAStartup(MAKEWORD(2, 2), &wsaData);
 		}
 
-		~TcpWin()
+		~TcpImpl()
 		{
 			Stop();
 			WSACleanup();
@@ -251,7 +251,7 @@ namespace Hap
 			}
 
 			running = true;
-			task = std::thread(&TcpWin::run, this);
+			task = std::thread(&TcpImpl::run, this);
 
 			return running;
 		}
@@ -267,11 +267,11 @@ namespace Hap
 				task.join();
 		}
 
-	} tcpWin;
+	} tcp;
 
 	Tcp* Tcp::Create(Hap::Http::Server* http)
 	{
-		tcpWin._http = http;
-		return &tcpWin;
+		tcp._http = http;
+		return &tcp;
 	}
 }
