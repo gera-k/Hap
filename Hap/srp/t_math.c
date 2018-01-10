@@ -1063,7 +1063,7 @@ BigIntegerModExp(BigInteger r, BigInteger b, BigInteger e, BigInteger m, BigInte
 unsigned int
 BigIntegerModInt(BigInteger d, unsigned int m, BigIntegerCtx c)
 {
-	mp_digit r;
+	mp_digit r = 0;
 	mp_mod_d(d, m, &r);
 	return r;
 }

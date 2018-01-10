@@ -16,7 +16,7 @@ extern "C" {
 
 		for (unsigned i = 0; i < size; i++)
 		{
-			*data++ = /*rand()*/ i & 0xFF;
+			*data++ = rand() & 0xFF;
 		}
 	}
 }
