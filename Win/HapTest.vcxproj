@@ -443,9 +443,9 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\Win\HapMdns.cpp" />
-    <ClCompile Include="..\Win\HapTcp.cpp" />
-    <ClCompile Include="..\Win\HapTest.cpp" />
+    <ClCompile Include="HapMdns.cpp" />
+    <ClCompile Include="HapTcp.cpp" />
+    <ClCompile Include="HapTest.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -60,6 +60,16 @@ namespace Hap
 				return t->end - t->start;
 			}
 
+			// object/array size
+			int size(int i) const
+			{
+				auto t = tk(i);
+				if (t == nullptr)
+					return 0;
+
+				return t->size;
+			}
+
 			// is this is the 'null' token?
 			bool is_null(int i) const
 			{

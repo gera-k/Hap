@@ -28,6 +28,9 @@ namespace Hap
 	constexpr uint16_t MaxHttpBlock = 1024;					// max size of encrypted block (5.5.2 Session securiry)
 	constexpr uint16_t MaxHttpFrame = MaxHttpBlock + 2 + 16;// max HTTP frame 
 
+	constexpr uint16_t DefString = 64;		// default length of a string characteristic
+	constexpr uint16_t MaxString = 64;		// max string length
+
 	// generic buffer (pointer/length pair)
 	template<typename T>
 	class Buf : protected std::pair<T, size_t>
@@ -72,6 +75,9 @@ namespace Hap
 		};
 	}
 
+	// HAP Server configuration
+	//	implementation should define methods for saving/restoring/resetting the config
+	//	implementatin may save/restore all parameters, or just some of them such as config number and deviceId
 	class Config
 	{
 	public:
@@ -91,12 +97,25 @@ namespace Hap
 
 		std::function<void()> Update;	// config update notification
 
-		enum Action
+		void Init(bool reset_ = false)
 		{
-			Reset,		// factory reset
-			Save,		// save to persistent storage
-			Restore,	// restore from persistent storage
-		};
+			if (!restore())	// restore saved config
+				default();	//	or create new default one	
+			if (reset_)		// if reset is requested, reset some values
+				reset();
+			save();			// save new config
+		}
+
+		void Save()
+		{
+			save();
+		}
+
+	protected:
+		virtual void default() = 0;
+		virtual void reset() = 0;
+		virtual bool restore() = 0;
+		virtual bool save() = 0;
 	};
 
 	extern Config* config;

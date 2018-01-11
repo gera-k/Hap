@@ -209,13 +209,13 @@
     <ClCompile Include="..\Linux\src\HapTest.cpp">
       <Filter>Linux</Filter>
     </ClCompile>
-    <ClCompile Include="..\Win\HapMdns.cpp">
+    <ClCompile Include="HapTest.cpp">
       <Filter>Win</Filter>
     </ClCompile>
-    <ClCompile Include="..\Win\HapTcp.cpp">
+    <ClCompile Include="HapTcp.cpp">
       <Filter>Win</Filter>
     </ClCompile>
-    <ClCompile Include="..\Win\HapTest.cpp">
+    <ClCompile Include="HapMdns.cpp">
       <Filter>Win</Filter>
     </ClCompile>
   </ItemGroup>
