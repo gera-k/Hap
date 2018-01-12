@@ -149,7 +149,7 @@ public:
 		char* key = new char[Hap::Controller::KeyLen * 2 + 1];
 
 		bool comma = false;
-		for (int i = 0; i < sizeofarr(_db); i++)
+		for (unsigned i = 0; i < sizeofarr(_db); i++)
 		{
 			Hap::Controller* ios = &_db[i];
 
@@ -304,7 +304,7 @@ private:
 
 	virtual bool _save() override
 	{
-		FILE* f = fopen(_fileName, "w+b");
+		FILE* f = fopen(_fileName, "w+");
 		if (f == NULL)
 		{
 			Log("Config: cannot open %s for write\n", _fileName);
@@ -340,7 +340,7 @@ private:
 	virtual bool _restore() override
 	{
 		Log("Config: restore from %s\n", _fileName);
-		FILE* f = fopen(_fileName, "r+b");
+		FILE* f = fopen(_fileName, "r+");
 		if (f == NULL)
 		{
 			Log("Config: cannot open %s for read\n", _fileName);
@@ -350,18 +350,19 @@ private:
 		Hap::Json::member om[] =
 		{
 			{ key[key_name], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_model], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_manuf], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_serial], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_firmware], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_device], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_config], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_category], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_status], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_setup], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_port], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_keys], Hap::Json::JSMN_ARRAY | Hap::Json::JSMN_UNDEFINED },
-		{ key[key_pairings], Hap::Json::JSMN_ARRAY | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_model], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_manuf], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_serial], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_firmware], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_device], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_config], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_category], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_status], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_setup], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_port], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_keys], Hap::Json::JSMN_ARRAY | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_pairings], Hap::Json::JSMN_ARRAY | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_db], Hap::Json::JSMN_ARRAY | Hap::Json::JSMN_UNDEFINED },
 		};
 		bool ret = false;
 		char* b = nullptr;
@@ -379,7 +380,7 @@ private:
 		if (fseek(f, 0, SEEK_SET) < 0)
 			goto Ret;
 
-		if (fread(b, 1, size, f) != size)
+		if (fread(b, 1, size, f) != size_t(size))
 			goto Ret;
 
 		if (!js.parse(b, (uint16_t)size))
@@ -482,6 +483,8 @@ private:
 						}
 					}
 				}
+				break;
+			case key_db:
 				break;
 			default:
 				break;

@@ -235,7 +235,7 @@ namespace Hap
 			address.sin_port = Hap::config->port;
 
 			Dbg("Tcp::Start - bind %d to %s:%d\n", server,
-					::inet_ntoa(address.sin_addr), ::ntohs(address.sin_port));
+					::inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
 			if (::bind(server, (struct sockaddr *)&address, sizeof(address))<0)
 			{
