@@ -255,7 +255,7 @@ private:
 	char _deviceId[Hap::DefString];			// Device ID (XX:XX:XX:XX:XX:XX, new deviceId generated on each factory reset)
 	char _setupCode[Hap::DefString];			// setupCode code XXX-XX-XXX
 
-	virtual void default() override
+	virtual void _default() override
 	{
 		Log("Config: reset\n");
 
@@ -286,7 +286,7 @@ private:
 		keys.Reset();
 	}
 
-	virtual void reset() override
+	virtual void _reset() override
 	{
 		Log("Config: reset\n");
 
@@ -300,7 +300,7 @@ private:
 		keys.Reset();
 	}
 
-	virtual bool save() override
+	virtual bool _save() override
 	{
 		FILE* f = fopen(_fileName, "w+b");
 		if (f == NULL)
@@ -335,7 +335,7 @@ private:
 		return true;
 	}
 
-	virtual bool restore() override
+	virtual bool _restore() override
 	{
 		Log("Config: restore from %s\n", _fileName);
 		FILE* f = fopen(_fileName, "r+b");

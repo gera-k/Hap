@@ -99,16 +99,16 @@ namespace Hap
 
 		void Init(bool reset_ = false)
 		{
-			if (!restore())	// restore saved config
-				default();	//	or create new default one	
+			if (!_restore())	// restore saved config
+				_default();	//	or create new default one	
 			if (reset_)		// if reset is requested, reset some values
-				reset();
-			save();			// save new config
+				_reset();
+			_save();			// save new config
 		}
 
 		void Save()
 		{
-			save();
+			_save();
 		}
 
 	protected:
@@ -132,10 +132,10 @@ namespace Hap
 		};
 		static const char* key[key_max];
 
-		virtual void default() = 0;
-		virtual void reset() = 0;
-		virtual bool restore() = 0;
-		virtual bool save() = 0;
+		virtual void _default() = 0;
+		virtual void _reset() = 0;
+		virtual bool _restore() = 0;
+		virtual bool _save() = 0;
 	};
 
 	extern Config* config;
