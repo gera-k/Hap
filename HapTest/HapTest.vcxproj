@@ -446,6 +446,7 @@
     <ClCompile Include="..\Win\HapMdns.cpp" />
     <ClCompile Include="..\Win\HapTcp.cpp" />
     <ClCompile Include="..\Win\HapTest.cpp" />
+    <ClCompile Include="..\Win\HapWin.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

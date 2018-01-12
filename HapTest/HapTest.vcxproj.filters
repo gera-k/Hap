@@ -218,5 +218,8 @@
     <ClCompile Include="..\Win\HapTest.cpp">
       <Filter>Win</Filter>
     </ClCompile>
+    <ClCompile Include="..\Win\HapWin.cpp">
+      <Filter>Win</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

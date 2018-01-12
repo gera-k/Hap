@@ -40,6 +40,16 @@ namespace Hap
 				return &_tk[i];
 			}
 
+			// token type
+			int8_t type(int i)
+			{
+				auto t = tk(i);
+				if (t == nullptr)
+					return int8_t(JSMN_UNDEFINED);
+
+				return t->type;
+			}
+
 			// token start
 			const char* start(int i) const
 			{

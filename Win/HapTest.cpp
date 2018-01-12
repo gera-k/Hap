@@ -7,6 +7,12 @@
 
 #include "Hap.h"
 
+extern "C" void t_stronginitrand();
+
+#define Log Hap::Log
+
+#define ACCESSORY_NAME "WinTest"
+
 // convert bin to hex, sizeof(s) must be >= size*2 + 1
 void bin2hex(uint8_t* buf, size_t size, char* s)
 {
@@ -44,6 +50,8 @@ void hex2bin(const char* s, uint8_t* buf, size_t size)
 		*buf++ = b;
 	}
 }
+
+// HAP database
 
 class MyAccessoryInformation : public Hap::AccessoryInformation
 {
@@ -121,17 +129,14 @@ public:
 
 } db;
 
+// Pairing records
+
 class MyPairings : public Hap::Pairings
 {
 public:
 	void Reset()
 	{
 		init();
-	}
-
-	bool Restore()
-	{
-		return false;
 	}
 
 	bool Save(FILE* f)
@@ -151,7 +156,7 @@ public:
 
 			bin2hex(ios->key, ios->KeyLen, key);
 
-			fprintf(f, "\t\t%c{\"id\":\"%.*s\",\"key\":\"%s\",\"perm\":%d}\n", comma ? ',' :' ', ios->idLen, ios->id, key, ios->perm);
+			fprintf(f, "\t\t%c[\"%.*s\",\"%s\",\"%d\"]\n", comma ? ',' :' ', ios->idLen, ios->id, key, ios->perm);
 			comma = true;
 		}
 
@@ -159,7 +164,24 @@ public:
 
 		return true;
 	}
+
+	bool Add(const char* id, int id_len, const char* key, int key_len, uint8_t perm)
+	{
+		if (key_len != Hap::Controller::KeyLen * 2)
+			return false;
+
+		uint8_t* key_bin = new uint8_t[Hap::Controller::KeyLen];
+		hex2bin(key, key_bin, Hap::Controller::KeyLen);
+
+		bool ret = Pairings::Add((const uint8_t*)id, id_len, key_bin, Hap::Controller::Perm(perm));
+
+		delete[] key_bin;
+
+		return ret;
+	}
 };
+
+// Crypto keys
 
 class MyCrypto : public Hap::Crypt::Ed25519
 {
@@ -237,7 +259,7 @@ private:
 	{
 		Log("Config: reset\n");
 
-		strcpy(_name, "WinTest");
+		strcpy(_name, ACCESSORY_NAME);
 		strcpy(_model, "TestModel");
 		strcpy(_manufacturer, "TestMaker");
 		strcpy(_serialNumber, "0001");
@@ -290,21 +312,21 @@ private:
 		Log("Config: save to %s\n", _fileName);
 
 		fprintf(f, "{\n");
-		fprintf(f, "\t\"name\":\"%s\",\n", name);
-		fprintf(f, "\t\"model\":\"%s\",\n", model);
-		fprintf(f, "\t\"manufacturer\":\"%s\",\n", manufacturer);
-		fprintf(f, "\t\"serialNumber\":\"%s\",\n", serialNumber);
-		fprintf(f, "\t\"firmwareRevision\":\"%s\",\n", firmwareRevision);
-		fprintf(f, "\t\"deviceId\":\"%s\",\n", deviceId);
-		fprintf(f, "\t\"configNum\":\"%d\",\n", configNum);
-		fprintf(f, "\t\"categoryId\":\"%d\",\n", categoryId);
-		fprintf(f, "\t\"statusFlags\":\"%d\",\n", statusFlags);
-		fprintf(f, "\t\"setupCode\":\"%s\",\n", setupCode);
-		fprintf(f, "\t\"port\":\"%d\",\n", swap_16(port));
-		fprintf(f, "\t\"keys\":[\n");
+		fprintf(f, "\t\"%s\":\"%s\",\n", key[key_name], name);
+		fprintf(f, "\t\"%s\":\"%s\",\n", key[key_model], model);
+		fprintf(f, "\t\"%s\":\"%s\",\n", key[key_manuf], manufacturer);
+		fprintf(f, "\t\"%s\":\"%s\",\n", key[key_serial], serialNumber);
+		fprintf(f, "\t\"%s\":\"%s\",\n", key[key_firmware], firmwareRevision);
+		fprintf(f, "\t\"%s\":\"%s\",\n", key[key_device], deviceId);
+		fprintf(f, "\t\"%s\":\"%d\",\n", key[key_config], configNum);
+		fprintf(f, "\t\"%s\":\"%d\",\n", key[key_category], categoryId);
+		fprintf(f, "\t\"%s\":\"%d\",\n", key[key_status], statusFlags);
+		fprintf(f, "\t\"%s\":\"%s\",\n", key[key_setup], setupCode);
+		fprintf(f, "\t\"%s\":\"%d\",\n", key[key_port], swap_16(port));
+		fprintf(f, "\t\"%s\":[\n", key[key_keys]);
 		keys.Save(f);
 		fprintf(f, "\t],\n");
-		fprintf(f, "\t\"pairings\":[\n");
+		fprintf(f, "\t\"%s\":[\n", key[key_pairings]);
 		pairings.Save(f);
 		fprintf(f, "\t]\n");
 		fprintf(f, "}\n");
@@ -325,25 +347,19 @@ private:
 
 		Hap::Json::member om[] =
 		{
-			{ "name", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "model", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "manufacturer", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "serialNumber", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "firmwareRevision", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "deviceId", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "configNum", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "categoryId", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "statusFlags", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "setupCode", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "port", Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
-			{ "keys", Hap::Json::JSMN_ARRAY | Hap::Json::JSMN_UNDEFINED },
-			{ "pairings", Hap::Json::JSMN_ARRAY | Hap::Json::JSMN_UNDEFINED },
-		};
-		enum key
-		{
-			key_name, key_model, key_manuf, key_serial, key_firmware, key_device, key_config,
-			key_category, key_status, key_setup, key_port, key_keys, key_pairings,
-			key_max
+			{ key[key_name], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_model], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_manuf], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_serial], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_firmware], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_device], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_config], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_category], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_status], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_setup], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_port], Hap::Json::JSMN_STRING | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_keys], Hap::Json::JSMN_ARRAY | Hap::Json::JSMN_UNDEFINED },
+			{ key[key_pairings], Hap::Json::JSMN_ARRAY | Hap::Json::JSMN_UNDEFINED },
 		};
 		bool ret = false;
 		char* b = nullptr;
@@ -439,6 +455,8 @@ private:
 				{
 					int k1 = js.find(i, 0);
 					int k2 = js.find(i, 1);
+					Log("Config: restore keys '%.*s' '%.*s'\n", js.length(k1), js.start(k1),
+						js.length(k2), js.start(k2));
 					keys.Restore(js.start(k1), js.length(k1), js.start(k2), js.length(k2));
 				}
 				else
@@ -446,6 +464,22 @@ private:
 				break;
 			case key_pairings:
 				pairings.Reset();
+				for (int k = 0; k < js.size(i); k++)
+				{
+					int r = js.find(i, k);	// pairing record ["id","key","perm"]
+					if (js.type(r) == Hap::Json::JSMN_ARRAY && js.size(r) == 3)
+					{
+						int id = js.find(r, 0);
+						int key = js.find(r, 1);
+						uint8_t perm;
+						if (id > 0 && key > 0 && js.is_number<uint8_t>(js.find(r, 2), perm))
+						{
+							if (pairings.Add(js.start(id), js.length(id), js.start(key), js.length(key), perm))
+								Log("Config: restore pairing '%.*s' '%.*s' %d\n", js.length(id), js.start(id),
+									js.length(key), js.start(key), perm);
+						}
+					}
+				}
 				break;
 			default:
 				break;
@@ -463,9 +497,9 @@ private:
 			Log("Config: cannot read/parse %s\n", _fileName);
 		return ret;
 	}
-};
 
-MyConfig myConfig("TestAccessory.hap");
+} myConfig(ACCESSORY_NAME".hap");
+
 Hap::Config* Hap::config = &myConfig;
 
 // statically allocated storage for HTTP processing
@@ -478,25 +512,6 @@ Hap::BufStatic<char, Hap::MaxHttpFrame * 1> http_tmp;
 Hap::Http::Server::Buf buf = { http_req, http_rsp, http_tmp };
 Hap::Http::Server http(buf, db, myConfig.pairings, myConfig.keys);
 
-#include <time.h>
-#include <stdlib.h>
-
-extern "C" {
-	void t_stronginitrand()
-	{
-		srand((unsigned)time(NULL));
-	}
-
-	void t_random(unsigned char* data, unsigned size)
-	{
-
-		for (unsigned i = 0; i < size; i++)
-		{
-			*data++ = rand() & 0xFF;
-		}
-	}
-}
-
 int main()
 {
 	t_stronginitrand();
@@ -507,6 +522,8 @@ int main()
 
 	// restore configuration
 	myConfig.Init();
+
+	// set config update callback
 	myConfig.Update = [mdns]() -> void {
 
 		bool mdnsUpdate = false;
@@ -584,3 +601,4 @@ int main()
 
 	return 0;
 }
+

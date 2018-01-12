@@ -1,9 +1,12 @@
-#include "Hap.cpp"
-#include "HapCrypt.cpp"
-#include "HapSrp.cpp"
-#include "HapHttp.cpp"
-#include "jsmn.cpp"
-#include "picohttpparser.cpp"
+#include <stdio.h> 
+#include <string>
+#include <iostream>
+
+#include "Hap.h"
+
+#include <time.h>
+#include <stdlib.h>
+#include <stdarg.h>
 
 // HAP logging functions
 namespace Hap
@@ -66,6 +69,8 @@ namespace Hap
 		vprintf(f, arg);
 	}
 }
+
+#define Log Hap::Log
 
 // random number generator
 extern "C" {

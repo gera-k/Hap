@@ -12,13 +12,13 @@
 
 extern "C" void t_random(unsigned char* data, unsigned size);
 
-#define Log printf
-//#define Dbg printf
-#define Dbg(...)
-void Hex(const char* Header, const void* Buffer, size_t Length);
-
 namespace Hap
 {
+	// Logging functions
+	void Log(const char* f, ...);
+	void Hex(const char* Header, const void* Buffer, size_t Length);
+#define Dbg Log
+
 	// global constants
 	constexpr uint8_t MaxPairings = 10 /*16*/;				// max number of pairings the accessory supports (4.11 Add pairing)
 															//	10 for now, until > 1024 byte frames are supported	TODO: fix
@@ -112,6 +112,26 @@ namespace Hap
 		}
 
 	protected:
+		enum
+		{
+			key_name, 
+			key_model, 
+			key_manuf, 
+			key_serial, 
+			key_firmware, 
+			key_device, 
+			key_config,
+			key_category, 
+			key_status, 
+			key_setup, 
+			key_port, 
+			key_keys, 
+			key_pairings,
+			key_db,
+			key_max
+		};
+		static const char* key[key_max];
+
 		virtual void default() = 0;
 		virtual void reset() = 0;
 		virtual bool restore() = 0;
