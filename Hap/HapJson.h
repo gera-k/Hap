@@ -129,6 +129,8 @@ namespace Hap
 
 			template<typename T> bool is_number(int i, T& value) const
 			{
+				Dbg("unknown number\n");
+
 				return false;
 			}
 			template<typename T> bool is_number(int i, std::enable_if_t<std::is_floating_point<T>::value, T&> value)
@@ -151,6 +153,8 @@ namespace Hap
 
 				int64_t v = atoll(copy(i, s, sizeofarr(s)));
 
+				Dbg("signed int '%s' -> %lld\n", s, v);
+
 				if (v >= std::numeric_limits<T>::min() && v <= std::numeric_limits<T>::max())
 				{
 					value = static_cast<T>(v);
@@ -165,6 +169,8 @@ namespace Hap
 					return false;
 
 				uint64_t v = atoll(copy(i, s, sizeofarr(s)));
+
+				Dbg("unsigned int '%s' -> %llu\n", s, v);
 
 				if (v >= std::numeric_limits<T>::min() && v <= std::numeric_limits<T>::max())
 				{

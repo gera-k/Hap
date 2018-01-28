@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <string>
 #include <iostream>
+#include <thread>
+
+#include "chip_hw.h"
 
 #include "Hap.h"
 
@@ -79,34 +82,138 @@ public:
 class MyLb : public Hap::Lightbulb
 {
 private:
+	Hap::Characteristic::Brightness _brightness;
 	Hap::Characteristic::Name _name;
-	int _n;
-public:
-	MyLb(Hap::Characteristic::Name::V name, int n) : _n(n)
-	{
 
+	std::thread _led;
+	bool _run = false;
+
+	bool _OnUpdated = false;
+
+	bool _BrightnessUpdated = false;
+
+	// convert Brightness percentage to/from PWM pulse length
+	void setBrightness(R8::PWM::Length max, R8::PWM::Length val)
+	{
+		Hap::Characteristic::Brightness::V v;
+
+		if (val == max)
+			v = 100;
+		else if (val == 0)
+			v = 0;
+		else
+			v = val * (100/max);
+
+		_brightness.Value(v);
+	}
+	R8::PWM::Length getBrightness(R8::PWM::Length max)
+	{
+		R8::PWM::Length d = _brightness.Value() * max / 100;
+
+		return d;
+	}
+
+public:
+	MyLb(Hap::Characteristic::Name::V name)
+	{
+		AddBrightness(_brightness);
 		AddName(_name);
+
 		_name.Value(name);
 
-		On().onRead([this](Hap::Obj::rd_prm& p) -> void {
-			Log("MyLb%d: read On: %d\n", _n, On().Value());
+		_on.onRead([this](Hap::Obj::rd_prm& p) -> void {
+			Log("%s: read On: %d\n", _name.Value(), _on.Value());
 		});
 
-		On().onWrite([this](Hap::Obj::wr_prm& p, Hap::Characteristic::On::V v) -> void {
-			Log("MyLb%d: write On: %d -> %d\n", _n, On().Value(), v);
+		_on.onWrite([this](Hap::Obj::wr_prm& p, Hap::Characteristic::On::V v) -> void {
+			_OnUpdated = true;
+			Log("%s: write On: %d -> %d\n", _name.Value(), _on.Value(), v);
+		});
+
+		_brightness.onRead([this](Hap::Obj::rd_prm& p) -> void {
+			Log("%s: read Brightness: %d\n", _name.Value(), _brightness.Value());
+		});
+
+		_brightness.onWrite([this](Hap::Obj::wr_prm& p, Hap::Characteristic::Brightness::V v) -> void {
+			// TODO: verify against min/max
+			_BrightnessUpdated = true;
+			Log("%s: write On: %d -> %d\n", _name.Value(), _brightness.Value(), v);
+		});
+
+		_run = true;
+
+		// TODO: sync this thread with onWrites which are in TCP thread context
+		_led = std::thread([this]() -> void {
+			R8::LRADC lradc;
+			R8::PWM pwm;
+			R8::PWM::Length max = 48;
+			uint8_t v;	// holds current PWM value
+
+			Log("%s: Enter thread\n", _name.Value());
+
+			// set initial value of brightness to current position of regulator
+			v = lradc.data();
+			setBrightness(max, v);
+			pwm.start(pwm.SCALE_1, max, v);
+
+			while (_run)
+			{
+				bool update = false;
+				uint8_t vn;
+
+				std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+				// first see if hw controller moved
+				vn = lradc.data();
+				if ((vn > v && (vn - v) > 1) || (v > vn && (v - vn) > 1))
+				{
+					// when moving to/from zero position, toggle the On characteristic
+					if (_on.Value() && vn < 1)
+					{
+						_on.Value(false);
+					}
+					else if (!_on.Value() && (vn >= 1))
+					{
+						_on.Value(true);
+					}
+
+					v = vn;
+					update = true;
+					setBrightness(max,v);
+				}
+				// if brightness updated through HAP
+				else if (_BrightnessUpdated)
+				{
+					v = getBrightness(max);
+					update = true;
+					_BrightnessUpdated = false;
+				}
+
+				if (update)
+					pwm.start(pwm.SCALE_1, max, _on.Value() ? v : 0);
+			}
+
+			Log("%s: Exit thread\n", _name.Value());
+
 		});
 	}
 
-} myLb1("Light-1", 1), myLb2("Light-2", 2);
+	virtual ~MyLb()
+	{
+		_run = false;
+		if (_led.joinable())
+			_led.join();
+	}
 
-class MyAcc : public Hap::Accessory<3>
+} myLb("Red LED");
+
+class MyAcc : public Hap::Accessory<2>
 {
 public:
-	MyAcc() : Hap::Accessory<3>()
+	MyAcc() : Hap::Accessory<2>()
 	{
 		AddService(&myAis);
-		AddService(&myLb1);
-		AddService(&myLb2);
+		AddService(&myLb);
 	}
 
 } myAcc;

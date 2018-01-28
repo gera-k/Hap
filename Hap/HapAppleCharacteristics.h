@@ -5,6 +5,46 @@ namespace Hap
 {
 	namespace Characteristic
 	{
+		// Brightness
+		//	UUID 00000008-0000-1000-8000-0026BB765291
+		//	Permissions 	Paired Read, Paired Write, Notify
+		//	Format 			int
+		//	Minimum Value	0
+		//	Maximum Value	100
+		//	Step Value		1
+		//	Unit 			percentage
+		class Brightness : public Simple< 4, FormatId::Int>
+		{
+		protected:
+			Property::MinValue<FormatId::Int> _min;
+			Property::MaxValue<FormatId::Int> _max;
+			Property::MinStep<FormatId::Int> _step;
+			Property::Unit _unit;
+		public:
+			static constexpr const char* Type = "8";
+
+			Brightness(Simple::V value = 0) : Simple(
+				Type,
+				Property::Permissions::PairedRead |
+				Property::Permissions::PairedWrite |
+				Property::Permissions::Events
+			)
+			{
+				AddProperty(&_min);
+				AddProperty(&_max);
+				AddProperty(&_step);
+				AddProperty(&_unit);
+
+				_min.set(0);
+				_max.set(100);
+				_step.set(1);
+				_unit.set(Property::Unit::T::percentage);
+
+				Value(value);
+			}
+
+		};
+
 		// Firmware Revision
 		//	UUID 00000052-0000-1000-8000-0026BB765291
 		//	Permissions		Paired Read
@@ -16,7 +56,7 @@ namespace Hap
 
 			FirmwareRevision(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedRead
+				Property::Permissions::PairedRead
 			)
 			{
 				Value(value);
@@ -34,7 +74,7 @@ namespace Hap
 
 			HardwareRevision(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedRead
+				Property::Permissions::PairedRead
 			)
 			{
 				Value(value);
@@ -52,7 +92,7 @@ namespace Hap
 
 			Identify(Simple::V value = false) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedWrite
+				Property::Permissions::PairedWrite
 			)
 			{
 			}
@@ -71,7 +111,7 @@ namespace Hap
 
 			Manufacturer(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedRead
+				Property::Permissions::PairedRead
 			)
 			{
 				Value(value);
@@ -90,7 +130,7 @@ namespace Hap
 
 			Model(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedRead
+				Property::Permissions::PairedRead
 			)
 			{
 				Value(value);
@@ -109,7 +149,7 @@ namespace Hap
 
 			Name(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedRead
+				Property::Permissions::PairedRead
 			)
 			{
 				Value(value);
@@ -127,22 +167,12 @@ namespace Hap
 
 			On(Simple::V value = false) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedRead |
-				Hap::Property::Permissions::PairedWrite |
-				Hap::Property::Permissions::Events
+				Property::Permissions::PairedRead |
+				Property::Permissions::PairedWrite |
+				Property::Permissions::Events
 			)
 			{
 				Value(value);
-			}
-
-			void on()
-			{
-				Value(true);
-			}
-
-			void off()
-			{
-				Value(false);
 			}
 		};
 
@@ -158,7 +188,7 @@ namespace Hap
 
 			SerialNumber(Simple::V value = nullptr) : Simple(
 				Type,
-				Hap::Property::Permissions::PairedRead
+				Property::Permissions::PairedRead
 			)
 			{
 				Value(value);

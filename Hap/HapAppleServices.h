@@ -67,11 +67,11 @@ namespace Hap
 	protected:
 		Characteristic::On _on;
 
-//		void AddBrightness(Characteristic::Brightness& ch) { AddChar(&ch, 1); }
-//		void AddHue(Characteristic::Hue& ch) { AddChar(&ch, 2); }
+		void AddBrightness(Characteristic::Brightness& ch) { AddCharacteristic(&ch, 1); }
+//		void AddHue(Characteristic::Hue& ch) { AddCharacteristic(&ch, 2); }
 		void AddName(Characteristic::Name& ch) { AddCharacteristic(&ch, 3); }
-//		void AddSaturation(Characteristic::Saturation& ch) { AddChar(&ch, 4); }
-//		void AddColorTemp(Characteristic::ColorTemp& ch) { AddChar(&ch, 5); }
+//		void AddSaturation(Characteristic::Saturation& ch) { AddCharacteristic(&ch, 4); }
+//		void AddColorTemp(Characteristic::ColorTemp& ch) { AddCharacteristic(&ch, 5); }
 
 	public:
 		static constexpr const char* Type = "43";
@@ -85,10 +85,6 @@ namespace Hap
 		{
 			AddCharacteristic(&_on, 0);
 		}
-
-		// access to characteristics
-		Characteristic::On& On() { return _on; }
-
 	};
 }
 
