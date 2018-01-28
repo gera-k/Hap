@@ -87,10 +87,8 @@ private:
 
 	std::thread _led;
 	bool _run = false;
-
-	bool _OnUpdated = false;
-
-	bool _BrightnessUpdated = false;
+	bool _OnUpdated = false;	// updated by HAP
+	bool _BrightnessUpdated = false;	// updated by HAP
 
 	// convert Brightness percentage to/from PWM pulse length
 	void setBrightness(R8::PWM::Length max, R8::PWM::Length val)
@@ -148,6 +146,7 @@ public:
 			R8::PWM pwm;
 			R8::PWM::Length max = 48;
 			uint8_t v;	// holds current PWM value
+			uint8_t va;	// last ACP value set to PWM (used when brightness is changed by HAP so v and va go out of sync)
 
 			Log("%s: Enter thread\n", _name.Value());
 
@@ -155,6 +154,7 @@ public:
 			v = lradc.data();
 			setBrightness(max, v);
 			pwm.start(pwm.SCALE_1, max, v);
+			va = v;
 
 			while (_run)
 			{
@@ -165,19 +165,19 @@ public:
 
 				// first see if hw controller moved
 				vn = lradc.data();
-				if ((vn > v && (vn - v) > 1) || (v > vn && (v - vn) > 1))
+				if ((vn > va && (vn - va) > 1) || (va > vn && (va - vn) > 1))
 				{
 					// when moving to/from zero position, toggle the On characteristic
-					if (_on.Value() && vn < 1)
+					if (_on.Value() && vn < 2)
 					{
 						_on.Value(false);
 					}
-					else if (!_on.Value() && (vn >= 1))
+					else if (!_on.Value() && (vn >= 2))
 					{
 						_on.Value(true);
 					}
 
-					v = vn;
+					v = va = vn;
 					update = true;
 					setBrightness(max,v);
 				}
@@ -187,6 +187,12 @@ public:
 					v = getBrightness(max);
 					update = true;
 					_BrightnessUpdated = false;
+				}
+
+				if (_OnUpdated)
+				{
+					update = true;
+					_OnUpdated = false;
 				}
 
 				if (update)

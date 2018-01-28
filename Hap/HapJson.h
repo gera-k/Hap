@@ -160,6 +160,7 @@ namespace Hap
 					value = static_cast<T>(v);
 					return true;
 				}
+				return false;
 			}
 			template<typename T> bool is_number(int i, std::enable_if_t<std::is_integral<T>::value && !std::numeric_limits<T>::is_signed, T&> value) const
 			{
