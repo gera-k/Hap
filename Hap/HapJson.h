@@ -133,7 +133,7 @@ namespace Hap
 
 				return false;
 			}
-			template<typename T> bool is_number(int i, std::enable_if_t<std::is_floating_point<T>::value, T&> value)
+			template<typename T> bool is_number(int i, std::enable_if_t<std::is_floating_point<T>::value, T&> value) const
 			{
 				char s[24];
 				auto t = tk(i);
@@ -144,7 +144,7 @@ namespace Hap
 				value = v;
 				return true;
 			}
-			template<typename T> bool is_number(int i, std::enable_if_t<std::is_integral<T>::value && std::numeric_limits<T>::is_signed, T&> value)
+			template<typename T> bool is_number(int i, std::enable_if_t<std::is_integral<T>::value && std::numeric_limits<T>::is_signed, T&> value) const
 			{
 				char s[24];
 				auto t = tk(i);
@@ -161,7 +161,7 @@ namespace Hap
 					return true;
 				}
 			}
-			template<typename T> bool is_number(int i, std::enable_if_t<std::is_integral<T>::value && !std::numeric_limits<T>::is_signed, T&> value)
+			template<typename T> bool is_number(int i, std::enable_if_t<std::is_integral<T>::value && !std::numeric_limits<T>::is_signed, T&> value) const
 			{
 				char s[24];
 				auto t = tk(i);

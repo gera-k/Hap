@@ -77,21 +77,30 @@ public:
 class MyLb : public Hap::Lightbulb
 {
 private:
+	Hap::Characteristic::Brightness _brightness;
 	Hap::Characteristic::Name _name;
 	int _n;
 public:
 	MyLb(Hap::Characteristic::Name::V name, int n) : _n(n)
 	{
-
+		AddBrightness(_brightness);
 		AddName(_name);
 		_name.Value(name);
 
-		On().onRead([this](Hap::Obj::rd_prm& p) -> void {
-			Log("MyLb%d: read On: %d\n", _n, On().Value());
+		_on.onRead([this](Hap::Obj::rd_prm& p) -> void {
+			Log("MyLb%d: read On: %d\n", _n, _on.Value());
 		});
 
-		On().onWrite([this](Hap::Obj::wr_prm& p, Hap::Characteristic::On::V v) -> void {
-			Log("MyLb%d: write On: %d -> %d\n", _n, On().Value(), v);
+		_on.onWrite([this](Hap::Obj::wr_prm& p, Hap::Characteristic::On::V v) -> void {
+			Log("MyLb%d: write On: %d -> %d\n", _n, _on.Value(), v);
+		});
+
+		_brightness.onRead([this](Hap::Obj::rd_prm& p) -> void {
+			Log("MyLb%d: read Brightness: %d\n", _n, _brightness.Value());
+		});
+
+		_brightness.onWrite([this](Hap::Obj::wr_prm& p, Hap::Characteristic::Brightness::V v) -> void {
+			Log("MyLb%d: write Brightness: %d -> %d\n", _n, _brightness.Value(), v);
 		});
 	}
 
@@ -512,8 +521,32 @@ Hap::BufStatic<char, Hap::MaxHttpFrame * 1> http_tmp;
 Hap::Http::Server::Buf buf = { http_req, http_rsp, http_tmp };
 Hap::Http::Server http(buf, db, myConfig.pairings, myConfig.keys);
 
+template<typename T> bool is_number(int i, T& value)
+{
+	Dbg("unknown number\n");
+
+	return false;
+}
+template<typename T> bool is_number(std::enable_if_t<std::is_integral<T>::value && std::numeric_limits<T>::is_signed, T&> value)
+{
+	return true;
+}
+
+bool tst()
+{
+	using type = int32_t;
+
+	type i;
+
+	return is_number<type>(i);
+
+	return false;
+}
+
+
 int main()
 {
+	tst();
 	t_stronginitrand();
 
 	// create servers
