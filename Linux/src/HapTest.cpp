@@ -9,6 +9,7 @@
 #include <string>
 #include <iostream>
 #include <thread>
+#include <signal.h>
 
 #include "chip_hw.h"
 
@@ -150,9 +151,10 @@ public:
 
 			Log("%s: Enter thread\n", _name.Value());
 
-			// set initial value of brightness to current position of regulator
+			// set initial value of Brightness and On to current position of regulator
 			v = lradc.data();
 			setBrightness(max, v);
+			_on.Value(v > 0);
 			pwm.start(pwm.SCALE_1, max, v);
 			va = v;
 
@@ -165,14 +167,14 @@ public:
 
 				// first see if hw controller moved
 				vn = lradc.data();
-				if ((vn > va && (vn - va) > 1) || (va > vn && (va - vn) > 1))
+				if ((vn > va && (vn - va) > 0) || (va > vn && (va - vn) > 0))
 				{
 					// when moving to/from zero position, toggle the On characteristic
-					if (_on.Value() && vn < 2)
+					if (_on.Value() && vn < 1)
 					{
 						_on.Value(false);
 					}
-					else if (!_on.Value() && (vn >= 2))
+					else if (!_on.Value() && (vn >= 1))
 					{
 						_on.Value(true);
 					}
@@ -630,22 +632,17 @@ Hap::BufStatic<char, Hap::MaxHttpFrame * 1> http_tmp;
 Hap::Http::Server::Buf buf = { http_req, http_rsp, http_tmp };
 Hap::Http::Server http(buf, db, myConfig.pairings, myConfig.keys);
 
-
-//#define NOSRV
+bool Hap::debug = false;
 
 int main()
 {
 	// create servers
-
-#ifndef NOSRV
 	Hap::Mdns* mdns = Hap::Mdns::Create();
 	Hap::Tcp* tcp = Hap::Tcp::Create(&http);
-#endif
 
 	// restore configuration
 	myConfig.Init();
 
-#ifndef NOSRV
 	// set config update callback
 	myConfig.Update = [mdns]() -> void {
 
@@ -669,59 +666,26 @@ int main()
 		if (mdnsUpdate)
 			mdns->Update();
 	};
-#endif
 
 	// init static objects
 	db.Init(1);
 
-#ifndef NOSRV
 	// start servers
 	mdns->Start();
 	tcp->Start();
 
-	// wait for interrupt
-	char c;
-	std::cin >> c;
+	// wait for signal, gracefully handle SIGINT and SIGTERM
+	signal(SIGINT, [](int s)->void{
+		printf("===Interrupted===\n");
+	});
+	signal(SIGTERM, [](int s)->void{
+		printf("===Terminated===\n");
+	});
+	pause();
 
 	// stop servers
 	tcp->Stop();
 	mdns->Stop();
-
-#else
-	Hap::sid_t sid = http.Open();
-
-	static Hap::BufStatic<char, 4096> buf;
-	char* s = buf.ptr();
-	int l, len = buf.len();
-
-	l = db.getDb(sid, s, len);
-	s[l] = 0;
-	printf("sizeof(srv)=%d  db '%s'\n", sizeof(db), s);
-
-	//static const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":2,\"value\":true,\"ev\":true},{\"aid\":3,\"iid\":8,\"ev\":true}]}";
-	const char wr[] = "{\"characteristics\":[{\"aid\":1,\"iid\":9,\"value\":true,\"ev\":true},{\"aid\":1,\"iid\":11,\"value\":true,\"ev\":true}]}";
-
-	l = len;
-	auto rc = db.Write(sid, wr, sizeof(wr) - 1, s, l);
-	Log("Write: %s  rsp '%.*s'\n", Hap::Http::StatusStr(rc), l, s);
-
-	l = len;
-	memset(s, 0, l);
-	rc = db.getEvents(sid, s, l);
-	Log("Events: %s  rsp %d '%.*s'\n", Hap::Http::StatusStr(rc), l, l, s);
-
-	l = len;
-	memset(s, 0, l);
-	rc = db.getEvents(sid, s, l);
-	Log("Events: %s  rsp %d '%.*s'\n", Hap::Http::StatusStr(rc), l, l, s);
-
-	http.Close(sid);
-
-	//sha2_test();
-	//srp_test();
-	//return 0;
-
-#endif
 
 	return 0;
 }

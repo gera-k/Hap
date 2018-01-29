@@ -14,10 +14,12 @@ extern "C" void t_random(unsigned char* data, unsigned size);
 
 namespace Hap
 {
+	extern bool debug;
+
 	// Logging functions
 	void Log(const char* f, ...);
 	void Hex(const char* Header, const void* Buffer, size_t Length);
-#define Dbg Log
+	#define Dbg if(debug)Log
 
 	// global constants
 	constexpr uint8_t MaxPairings = 10 /*16*/;				// max number of pairings the accessory supports (4.11 Add pairing)
