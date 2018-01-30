@@ -1,3 +1,5 @@
+// derived from JSMN https://github.com/zserge/jsmn
+
 #ifndef __JSMN_H_
 #define __JSMN_H_
 
