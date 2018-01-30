@@ -1,0 +1,7 @@
+Release/src/*.[do]
+Release/HapLinux
+Debug/src/*.[do]
+Debug/HapLinux
+
+/Debug/
+/Release/
