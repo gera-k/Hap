@@ -28,13 +28,14 @@ SOFTWARE.
 #include <thread>
 #include <signal.h>
 
+#include "CLI11.hpp"
 #include "chip_hw.h"
-
 #include "Hap.h"
 
 #define Log Hap::Log
 
 #define ACCESSORY_NAME "LinuxTest"
+#define CONFIG_NAME "/etc/hap.cfg"
 
  // convert bin to hex, sizeof(s) must be >= size*2 + 1
 void bin2hex(uint8_t* buf, size_t size, char* s)
@@ -635,7 +636,7 @@ private:
 		return ret;
 	}
 
-} myConfig(ACCESSORY_NAME".hap");
+} myConfig(CONFIG_NAME);
 
 Hap::Config* Hap::config = &myConfig;
 
@@ -651,14 +652,40 @@ Hap::Http::Server http(buf, db, myConfig.pairings, myConfig.keys);
 
 bool Hap::debug = false;
 
-int main()
+// random number generator
+extern "C" {
+	void t_stronginitrand()
+	{
+		srand((unsigned)time(NULL));
+	}
+
+	void t_random(unsigned char* data, unsigned size)
+	{
+
+		for (unsigned i = 0; i < size; i++)
+		{
+			*data++ = rand() & 0xFF;
+		}
+	}
+}
+
+int main(int argc, char* argv[])
 {
+	CLI::App app{"LinuxTest HAP server"};
+
+	bool reset = false;
+	app.add_flag("-R,--reset", reset, "Reset configuration");
+
+	CLI11_PARSE(app, argc, argv);
+
+	t_stronginitrand();
+
 	// create servers
 	Hap::Mdns* mdns = Hap::Mdns::Create();
 	Hap::Tcp* tcp = Hap::Tcp::Create(&http);
 
 	// restore configuration
-	myConfig.Init();
+	myConfig.Init(reset);
 
 	// set config update callback
 	myConfig.Update = [mdns]() -> void {

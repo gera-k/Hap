@@ -90,21 +90,3 @@ namespace Hap
 		vprintf(f, arg);
 	}
 }
-
-// random number generator
-extern "C" {
-	void t_stronginitrand()
-	{
-		srand((unsigned)time(NULL));
-	}
-
-	void t_random(unsigned char* data, unsigned size)
-	{
-
-		for (unsigned i = 0; i < size; i++)
-		{
-			*data++ = rand() & 0xFF;
-		}
-	}
-}
-
