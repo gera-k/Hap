@@ -1,3 +1,5 @@
+# This repo is obsolete. Refer to newer implementation [here](https://github.com/gera-k/uHap)
+
 # Hap
 HomeKit Server
 
